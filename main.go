@@ -8,14 +8,26 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Println(versionString())
+		return
+	}
+
 	configFlag := flag.String("config", "", "Path to JSON config file (overrides JMAP2NATS_CONFIG and ./jmap2nats.json)")
 	printConfig := flag.Bool("print-config", false, "Print the merged effective config and exit")
+	versionFlag := flag.Bool("version", false, "Print version and exit")
 	verbose := flag.Bool("verbose", false, "Enable debug-level logging")
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Println(versionString())
+		return
+	}
 
 	path := resolveConfigPath(*configFlag)
 	cfg, err := LoadConfig(path)
@@ -63,6 +75,38 @@ func run(ctx context.Context, cfg Config, log *slog.Logger) error {
 		return err
 	}
 	return nil
+}
+
+func versionString() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	v := info.Main.Version
+	var rev string
+	var dirty bool
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.modified":
+			dirty = s.Value == "true"
+		}
+	}
+	if v == "" || v == "(devel)" {
+		if rev == "" {
+			return "devel"
+		}
+		short := rev
+		if len(short) > 12 {
+			short = short[:12]
+		}
+		if dirty {
+			short += "+dirty"
+		}
+		return "devel " + short
+	}
+	return v
 }
 
 func resolveConfigPath(flagVal string) string {

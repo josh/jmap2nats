@@ -96,6 +96,9 @@ Total default storage footprint ≈ 1 GiB (64 MiB stream + 960 MiB parts).
 jmap2nats -config ./jmap2nats.json
 ```
 
+`jmap2nats -version` (or `jmap2nats version`) prints the build version
+and exits.
+
 The service:
 
 1. Authenticates with the JMAP server.
