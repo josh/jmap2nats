@@ -1,0 +1,209 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type Config struct {
+	JMAP          JMAPConfig   `json:"jmap"`
+	NATS          NATSConfig   `json:"nats"`
+	Stream        StreamConfig `json:"stream"`
+	Parts         PartsConfig  `json:"parts"`
+	BackfillLimit uint64       `json:"backfill_limit"`
+}
+
+type JMAPConfig struct {
+	SessionURL string `json:"session_url"`
+	Token      string `json:"token"`
+	AccountID  string `json:"account_id"`
+}
+
+type NATSConfig struct {
+	URL   string `json:"url"`
+	Creds string `json:"creds"`
+}
+
+type StreamConfig struct {
+	Name          string   `json:"name"`
+	SubjectPrefix string   `json:"subject_prefix"`
+	Retention     Duration `json:"retention"`
+	MaxBytes      Bytes    `json:"max_bytes"`
+	DedupWindow   Duration `json:"dedup_window"`
+}
+
+type PartsConfig struct {
+	Bucket     string `json:"bucket"`
+	MaxBytes   Bytes  `json:"max_bytes"`
+	MaxPerPart Bytes  `json:"max_per_part"`
+}
+
+func defaultConfig() Config {
+	return Config{
+		NATS: NATSConfig{
+			URL: "nats://localhost:4222",
+		},
+		Stream: StreamConfig{
+			Name:          "JMAP_EMAILS",
+			SubjectPrefix: "jmap.email",
+			Retention:     Duration(7 * 24 * time.Hour),
+			MaxBytes:      64 * MiB,
+			DedupWindow:   Duration(24 * time.Hour),
+		},
+		Parts: PartsConfig{
+			Bucket:     "email-parts",
+			MaxBytes:   960 * MiB,
+			MaxPerPart: 25 * MiB,
+		},
+		BackfillLimit: 100,
+	}
+}
+
+func LoadConfig(path string) (Config, error) {
+	cfg := defaultConfig()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return cfg, fmt.Errorf("read config %s: %w", path, err)
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return cfg, fmt.Errorf("parse config %s: %w", path, err)
+	}
+	if err := cfg.validate(); err != nil {
+		return cfg, fmt.Errorf("invalid config %s: %w", path, err)
+	}
+	return cfg, nil
+}
+
+func (c Config) validate() error {
+	if c.JMAP.SessionURL == "" {
+		return fmt.Errorf("jmap.session_url is required")
+	}
+	if c.JMAP.Token == "" {
+		return fmt.Errorf("jmap.token is required")
+	}
+	if c.NATS.URL == "" {
+		return fmt.Errorf("nats.url is required")
+	}
+	if c.Stream.Name == "" || c.Stream.SubjectPrefix == "" {
+		return fmt.Errorf("stream.name and stream.subject_prefix are required")
+	}
+	if c.Stream.MaxBytes <= 0 {
+		return fmt.Errorf("stream.max_bytes must be positive")
+	}
+	if c.Parts.Bucket == "" {
+		return fmt.Errorf("parts.bucket is required")
+	}
+	if c.Parts.MaxBytes <= 0 || c.Parts.MaxPerPart <= 0 {
+		return fmt.Errorf("parts.max_bytes and parts.max_per_part must be positive")
+	}
+	if c.Stream.Retention <= 0 {
+		return fmt.Errorf("stream.retention must be positive")
+	}
+	if c.BackfillLimit == 0 {
+		return fmt.Errorf("backfill_limit must be positive")
+	}
+	return nil
+}
+
+type Duration time.Duration
+
+func (d *Duration) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	v, err := time.ParseDuration(s)
+	if err != nil {
+		return fmt.Errorf("invalid duration %q: %w", s, err)
+	}
+	*d = Duration(v)
+	return nil
+}
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Duration(d).String())
+}
+
+func (d Duration) Duration() time.Duration { return time.Duration(d) }
+
+type Bytes int64
+
+const (
+	KiB Bytes = 1024
+	MiB       = 1024 * KiB
+	GiB       = 1024 * MiB
+)
+
+func (b *Bytes) UnmarshalJSON(data []byte) error {
+	if len(data) > 0 && data[0] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		v, err := parseByteSize(s)
+		if err != nil {
+			return err
+		}
+		*b = v
+		return nil
+	}
+	var n int64
+	if err := json.Unmarshal(data, &n); err != nil {
+		return err
+	}
+	*b = Bytes(n)
+	return nil
+}
+
+func (b Bytes) MarshalJSON() ([]byte, error) {
+	return json.Marshal(formatByteSize(b))
+}
+
+func (b Bytes) Int64() int64 { return int64(b) }
+
+func parseByteSize(s string) (Bytes, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("empty size")
+	}
+	suffixes := []struct {
+		s string
+		m Bytes
+	}{
+		{"GiB", GiB}, {"MiB", MiB}, {"KiB", KiB},
+		{"GB", 1_000_000_000}, {"MB", 1_000_000}, {"KB", 1_000},
+		{"B", 1},
+	}
+	for _, suf := range suffixes {
+		if strings.HasSuffix(s, suf.s) {
+			num := strings.TrimSpace(strings.TrimSuffix(s, suf.s))
+			f, err := strconv.ParseFloat(num, 64)
+			if err != nil {
+				return 0, fmt.Errorf("invalid size %q: %w", s, err)
+			}
+			return Bytes(f * float64(suf.m)), nil
+		}
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid size %q (expected suffix B/KiB/MiB/GiB)", s)
+	}
+	return Bytes(n), nil
+}
+
+func formatByteSize(b Bytes) string {
+	switch {
+	case b >= GiB && b%GiB == 0:
+		return fmt.Sprintf("%dGiB", b/GiB)
+	case b >= MiB && b%MiB == 0:
+		return fmt.Sprintf("%dMiB", b/MiB)
+	case b >= KiB && b%KiB == 0:
+		return fmt.Sprintf("%dKiB", b/KiB)
+	default:
+		return fmt.Sprintf("%dB", b)
+	}
+}
