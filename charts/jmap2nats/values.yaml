@@ -1,0 +1,84 @@
+image:
+  repository: ghcr.io/josh/jmap2nats
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+replicaCount: 1
+
+# Maps 1:1 to jmap2nats's config.json schema. The chart injects jmap.token_file
+# at template time; you don't need to set it.
+config:
+  jmap:
+    session_url: "https://api.fastmail.com/jmap/session"
+    account_id: ""
+  nats:
+    url: "nats://nats:4222"
+    creds: ""
+  stream:
+    name: "JMAP_EMAILS"
+    subject_prefix: "jmap.email"
+    max_age: "168h"
+    max_bytes: "64MiB"
+    dedup_window: "24h"
+  parts:
+    bucket: "email-parts"
+    max_bytes: "960MiB"
+    max_per_part: "25MiB"
+  backfill_limit: 100
+
+auth:
+  # Name of the Secret holding the JMAP bearer token. You must create this
+  # Secret yourself (e.g. via sealed-secrets, External Secrets, sops, or
+  # `kubectl create secret generic`). The pod will not start until it exists.
+  secretName: ""
+  # Key within the Secret holding the bearer token.
+  secretKey: token
+
+nack:
+  # Render a NACK Stream CRD (jetstream.nats.io/v1beta2). Requires the NACK
+  # controller installed in the cluster. Off by default; jmap2nats will create
+  # the stream itself at startup if you leave this disabled.
+  enabled: false
+  stream:
+    storage: file
+    retention: limits
+    discard: old
+    replicas: 1
+    compression: s2
+    maxMsgSize: 1048576
+    maxMsgsPerSubject: 1
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+  fsGroup: 65534
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

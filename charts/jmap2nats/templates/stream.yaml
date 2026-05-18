@@ -1,0 +1,22 @@
+{{- if .Values.nack.enabled -}}
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: {{ include "jmap2nats.fullname" . }}
+  labels:
+    {{- include "jmap2nats.labels" . | nindent 4 }}
+spec:
+  name: {{ .Values.config.stream.name | quote }}
+  subjects:
+    - {{ printf "%s.>" .Values.config.stream.subject_prefix | quote }}
+  storage: {{ .Values.nack.stream.storage }}
+  retention: {{ .Values.nack.stream.retention }}
+  discard: {{ .Values.nack.stream.discard }}
+  maxAge: {{ .Values.config.stream.max_age | quote }}
+  duplicateWindow: {{ .Values.config.stream.dedup_window | quote }}
+  maxBytes: {{ include "jmap2nats.parseBytes" .Values.config.stream.max_bytes }}
+  maxMsgSize: {{ .Values.nack.stream.maxMsgSize | int64 }}
+  maxMsgsPerSubject: {{ .Values.nack.stream.maxMsgsPerSubject | int64 }}
+  compression: {{ .Values.nack.stream.compression }}
+  replicas: {{ .Values.nack.stream.replicas | int }}
+{{- end }}

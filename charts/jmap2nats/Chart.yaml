@@ -1,0 +1,18 @@
+apiVersion: v2
+name: jmap2nats
+description: Bridge JMAP email push events to NATS JetStream
+type: application
+version: 0.1.0
+appVersion: "0.0.2"
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/josh/jmap2nats
+sources:
+  - https://github.com/josh/jmap2nats
+keywords:
+  - jmap
+  - nats
+  - jetstream
+  - email
+  - fastmail
+maintainers:
+  - name: Joshua Peek

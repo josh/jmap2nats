@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "jmap2nats.fullname" . }}
+  labels:
+    {{- include "jmap2nats.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "jmap2nats.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include "jmap2nats.configJson" . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "jmap2nats.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "jmap2nats.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: jmap2nats
+          image: {{ include "jmap2nats.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: JMAP2NATS_CONFIG
+              value: /etc/jmap2nats/config.json
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/jmap2nats/config.json
+              subPath: config.json
+              readOnly: true
+            - name: token
+              mountPath: /etc/jmap2nats/secrets
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "jmap2nats.fullname" . }}
+        - name: token
+          secret:
+            secretName: {{ .Values.auth.secretName | quote }}
+            defaultMode: 288
+            items:
+              - key: {{ .Values.auth.secretKey }}
+                path: token
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

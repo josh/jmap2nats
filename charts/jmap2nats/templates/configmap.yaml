@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "jmap2nats.fullname" . }}
+  labels:
+    {{- include "jmap2nats.labels" . | nindent 4 }}
+data:
+  config.json: |
+    {{- include "jmap2nats.configJson" . | nindent 4 }}
