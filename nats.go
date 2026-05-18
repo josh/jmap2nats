@@ -37,27 +37,37 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 		return nil, fmt.Errorf("init jetstream: %w", err)
 	}
 
-	stream, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
-		Name:       cfg.Stream.Name,
-		Subjects:   []string{cfg.Stream.SubjectPrefix + ".>"},
-		Retention:  jetstream.LimitsPolicy,
-		Discard:    jetstream.DiscardOld,
-		Storage:    jetstream.FileStorage,
-		MaxAge:     cfg.Stream.MaxAge.Duration(),
-		MaxBytes:   cfg.Stream.MaxBytes.Int64(),
-		Duplicates: cfg.Stream.DedupWindow.Duration(),
-	})
-	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("ensure stream %s: %w", cfg.Stream.Name, err)
+	var stream jetstream.Stream
+	if cfg.Stream.ExternallyManaged {
+		stream, err = js.Stream(ctx, cfg.Stream.Name)
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("get externally managed stream %s: %w", cfg.Stream.Name, err)
+		}
+		log.Info("stream verified (externally managed)", "name", cfg.Stream.Name)
+	} else {
+		stream, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+			Name:       cfg.Stream.Name,
+			Subjects:   []string{cfg.Stream.SubjectPrefix + ".>"},
+			Retention:  jetstream.LimitsPolicy,
+			Discard:    jetstream.DiscardOld,
+			Storage:    jetstream.FileStorage,
+			MaxAge:     cfg.Stream.MaxAge.Duration(),
+			MaxBytes:   cfg.Stream.MaxBytes.Int64(),
+			Duplicates: cfg.Stream.DedupWindow.Duration(),
+		})
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("ensure stream %s: %w", cfg.Stream.Name, err)
+		}
+		log.Info("stream ready",
+			"name", cfg.Stream.Name,
+			"subjects", cfg.Stream.SubjectPrefix+".>",
+			"max_age", cfg.Stream.MaxAge.Duration(),
+			"max_bytes", cfg.Stream.MaxBytes,
+			"dedup_window", cfg.Stream.DedupWindow.Duration(),
+		)
 	}
-	log.Info("stream ready",
-		"name", cfg.Stream.Name,
-		"subjects", cfg.Stream.SubjectPrefix+".>",
-		"max_age", cfg.Stream.MaxAge.Duration(),
-		"max_bytes", cfg.Stream.MaxBytes,
-		"dedup_window", cfg.Stream.DedupWindow.Duration(),
-	)
 
 	parts, err := js.CreateOrUpdateObjectStore(ctx, jetstream.ObjectStoreConfig{
 		Bucket:   cfg.Parts.Bucket,

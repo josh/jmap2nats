@@ -29,11 +29,12 @@ type NATSConfig struct {
 }
 
 type StreamConfig struct {
-	Name          string   `json:"name"`
-	SubjectPrefix string   `json:"subject_prefix"`
-	MaxAge        Duration `json:"max_age"`
-	MaxBytes      Bytes    `json:"max_bytes"`
-	DedupWindow   Duration `json:"dedup_window"`
+	Name              string   `json:"name"`
+	SubjectPrefix     string   `json:"subject_prefix"`
+	MaxAge            Duration `json:"max_age"`
+	MaxBytes          Bytes    `json:"max_bytes"`
+	DedupWindow       Duration `json:"dedup_window"`
+	ExternallyManaged bool     `json:"externally_managed"`
 }
 
 type PartsConfig struct {

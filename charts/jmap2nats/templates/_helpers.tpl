@@ -70,11 +70,16 @@ Explicit image.tag overrides pass through.
 
 {{/*
 Rendered config.json content. Merges the chart-owned token_file path into the
-user's .Values.config block.
+user's .Values.config block. When nack.enabled is true (and the user hasn't
+overridden it), also injects stream.externally_managed: true so the binary
+won't fight NACK over the stream's spec on startup.
 */}}
 {{- define "jmap2nats.configJson" -}}
 {{- $cfg := deepCopy .Values.config -}}
 {{- $_ := set $cfg.jmap "token_file" "/etc/jmap2nats/secrets/token" -}}
+{{- if and .Values.nack.enabled (not (hasKey $cfg.stream "externally_managed")) -}}
+{{- $_ := set $cfg.stream "externally_managed" true -}}
+{{- end -}}
 {{- $cfg | toJson -}}
 {{- end -}}
 

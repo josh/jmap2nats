@@ -71,22 +71,23 @@ Example `jmap2nats.json`:
 }
 ```
 
-| JSON path               | Default                 | Notes                                              |
-| ----------------------- | ----------------------- | -------------------------------------------------- |
-| `jmap.session_url`      | (required)              | e.g. `https://api.fastmail.com/jmap/session`       |
-| `jmap.token_file`       | (required)              | Path to a file containing the bearer token. Trailing whitespace is trimmed. Keep mode 0400. |
-| `jmap.account_id`       | primary mail account    | Override if not the session primary.               |
-| `nats.url`              | `nats://localhost:4222` |                                                    |
-| `nats.creds`            | unset                   | Path to a NATS creds file (NGS etc).               |
-| `stream.name`           | `JMAP_EMAILS`           |                                                    |
-| `stream.subject_prefix` | `jmap.email`            | Subject = `<prefix>.<accountId>.<emailId>`.        |
-| `stream.max_age`        | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.     |
-| `stream.max_bytes`      | `64MiB`                 | Sizes accept `KiB`/`MiB`/`GiB`.                    |
-| `stream.dedup_window`   | `24h`                   | Server-side `Nats-Msg-Id` dedup window.            |
-| `parts.bucket`          | `email-parts`           | Object Store bucket for all body/attachment parts. |
-| `parts.max_bytes`       | `960MiB`                | Bucket cap.                                        |
-| `parts.max_per_part`    | `25MiB`                 | Skip individual parts larger than this.            |
-| `backfill_limit`        | `100`                   | N most-recent emails to re-check on boot.          |
+| JSON path                   | Default                 | Notes                                                                                                                 |
+| --------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `jmap.session_url`          | (required)              | e.g. `https://api.fastmail.com/jmap/session`                                                                          |
+| `jmap.token_file`           | (required)              | Path to a file containing the bearer token. Trailing whitespace is trimmed. Keep mode 0400.                           |
+| `jmap.account_id`           | primary mail account    | Override if not the session primary.                                                                                  |
+| `nats.url`                  | `nats://localhost:4222` |                                                                                                                       |
+| `nats.creds`                | unset                   | Path to a NATS creds file (NGS etc).                                                                                  |
+| `stream.name`               | `JMAP_EMAILS`           |                                                                                                                       |
+| `stream.subject_prefix`     | `jmap.email`            | Subject = `<prefix>.<accountId>.<emailId>`.                                                                           |
+| `stream.max_age`            | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.                                                                        |
+| `stream.max_bytes`          | `64MiB`                 | Sizes accept `KiB`/`MiB`/`GiB`.                                                                                       |
+| `stream.dedup_window`       | `24h`                   | Server-side `Nats-Msg-Id` dedup window.                                                                               |
+| `stream.externally_managed` | `false`                 | Skip create/update; only verify the stream exists. Set true when another operator (e.g. NACK) owns the stream config. |
+| `parts.bucket`              | `email-parts`           | Object Store bucket for all body/attachment parts.                                                                    |
+| `parts.max_bytes`           | `960MiB`                | Bucket cap.                                                                                                           |
+| `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                               |
+| `backfill_limit`            | `100`                   | N most-recent emails to re-check on boot.                                                                             |
 
 Total default storage footprint ≈ 1 GiB (64 MiB stream + 960 MiB parts).
 
