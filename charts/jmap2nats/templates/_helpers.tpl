@@ -60,8 +60,8 @@ ServiceAccount name.
 {{- end -}}
 
 {{/*
-Container image reference. Tag defaults to "v" + .Chart.AppVersion (image tags
-are prefixed with v, e.g. v0.0.2). Explicit image.tag overrides pass through.
+Container image reference. Tag defaults to "v" + .Chart.AppVersion.
+Explicit image.tag overrides pass through.
 */}}
 {{- define "jmap2nats.image" -}}
 {{- $tag := default (printf "v%s" .Chart.AppVersion) .Values.image.tag -}}
