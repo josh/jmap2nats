@@ -29,12 +29,22 @@ config:
   backfill_limit: 100
 
 auth:
-  # Name of the Secret holding the JMAP bearer token. You must create this
-  # Secret yourself (e.g. via sealed-secrets, External Secrets, sops, or
-  # `kubectl create secret generic`). The pod will not start until it exists.
-  secretName: ""
-  # Key within the Secret holding the bearer token.
-  secretKey: token
+  # JMAP bearer token. You must create this Secret yourself (e.g. via
+  # sealed-secrets, External Secrets, sops, or `kubectl create secret generic`).
+  # The pod will not start until it exists. The token is mounted at
+  # /etc/jmap2nats/secrets/token and jmap.token_file is injected into the
+  # rendered config.json.
+  jmap:
+    secretName: ""
+    secretKey: token
+  # Optional NATS user NKEY seed (enables NKEY-based NATS authentication).
+  # Set nats.secretKey to enable. nats.secretName defaults to jmap.secretName
+  # when empty, so the seed can live in the same Secret as the JMAP token or
+  # a separate one. The seed is mounted at /etc/jmap2nats/secrets/nats.nk and
+  # nats.nkey_seed_file is injected into the rendered config.json.
+  nats:
+    secretName: ""
+    secretKey: ""
 
 nack:
   # Render a NACK Stream CRD (jetstream.nats.io/v1beta2). Requires the NACK

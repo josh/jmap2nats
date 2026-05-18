@@ -24,8 +24,9 @@ type JMAPConfig struct {
 }
 
 type NATSConfig struct {
-	URL   string `json:"url"`
-	Creds string `json:"creds"`
+	URL          string `json:"url"`
+	Creds        string `json:"creds"`
+	NkeySeedFile string `json:"nkey_seed_file"`
 }
 
 type StreamConfig struct {

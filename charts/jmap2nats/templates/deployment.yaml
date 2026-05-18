@@ -43,20 +43,29 @@ spec:
               mountPath: /etc/jmap2nats/config.json
               subPath: config.json
               readOnly: true
-            - name: token
+            - name: secrets
               mountPath: /etc/jmap2nats/secrets
               readOnly: true
       volumes:
         - name: config
           configMap:
             name: {{ include "jmap2nats.fullname" . }}
-        - name: token
-          secret:
-            secretName: {{ .Values.auth.secretName | quote }}
+        - name: secrets
+          projected:
             defaultMode: 288
-            items:
-              - key: {{ .Values.auth.secretKey }}
-                path: token
+            sources:
+              - secret:
+                  name: {{ .Values.auth.jmap.secretName | quote }}
+                  items:
+                    - key: {{ .Values.auth.jmap.secretKey }}
+                      path: token
+              {{- if .Values.auth.nats.secretKey }}
+              - secret:
+                  name: {{ .Values.auth.nats.secretName | default .Values.auth.jmap.secretName | quote }}
+                  items:
+                    - key: {{ .Values.auth.nats.secretKey }}
+                      path: nats.nk
+              {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

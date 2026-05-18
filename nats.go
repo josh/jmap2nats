@@ -24,6 +24,13 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 		nats.MaxReconnects(-1),
 		nats.RetryOnFailedConnect(true),
 	}
+	if cfg.NATS.NkeySeedFile != "" {
+		opt, err := nats.NkeyOptionFromSeed(cfg.NATS.NkeySeedFile)
+		if err != nil {
+			return nil, fmt.Errorf("load nats nkey: %w", err)
+		}
+		opts = append(opts, opt)
+	}
 	if cfg.NATS.Creds != "" {
 		opts = append(opts, nats.UserCredentials(cfg.NATS.Creds))
 	}
