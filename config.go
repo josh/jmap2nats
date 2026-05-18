@@ -19,7 +19,7 @@ type Config struct {
 
 type JMAPConfig struct {
 	SessionURL string `json:"session_url"`
-	Token      string `json:"token"`
+	TokenFile  string `json:"token_file"`
 	AccountID  string `json:"account_id"`
 }
 
@@ -82,8 +82,8 @@ func (c Config) validate() error {
 	if c.JMAP.SessionURL == "" {
 		return fmt.Errorf("jmap.session_url is required")
 	}
-	if c.JMAP.Token == "" {
-		return fmt.Errorf("jmap.token is required")
+	if c.JMAP.TokenFile == "" {
+		return fmt.Errorf("jmap.token_file is required")
 	}
 	if c.NATS.URL == "" {
 		return fmt.Errorf("nats.url is required")

@@ -50,7 +50,7 @@ Example `jmap2nats.json`:
 {
   "jmap": {
     "session_url": "https://api.fastmail.com/jmap/session",
-    "token": "fmu1-yourtokenhere"
+    "token_file": "/etc/jmap2nats/token"
   },
   "nats": {
     "url": "nats://localhost:4222"
@@ -74,7 +74,7 @@ Example `jmap2nats.json`:
 | JSON path               | Default                 | Notes                                              |
 | ----------------------- | ----------------------- | -------------------------------------------------- |
 | `jmap.session_url`      | (required)              | e.g. `https://api.fastmail.com/jmap/session`       |
-| `jmap.token`            | (required)              | Bearer token. Keep this file mode 0600.            |
+| `jmap.token_file`       | (required)              | Path to a file containing the bearer token. Trailing whitespace is trimmed. Keep mode 0400. |
 | `jmap.account_id`       | primary mail account    | Override if not the session primary.               |
 | `nats.url`              | `nats://localhost:4222` |                                                    |
 | `nats.creds`            | unset                   | Path to a NATS creds file (NGS etc).               |
