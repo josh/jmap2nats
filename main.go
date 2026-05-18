@@ -8,13 +8,14 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"syscall"
 )
 
+const version = "0.0.3"
+
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Println(versionString())
+		fmt.Println(version)
 		return
 	}
 
@@ -25,7 +26,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Println(versionString())
+		fmt.Println(version)
 		return
 	}
 
@@ -75,38 +76,6 @@ func run(ctx context.Context, cfg Config, log *slog.Logger) error {
 		return err
 	}
 	return nil
-}
-
-func versionString() string {
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return "unknown"
-	}
-	v := info.Main.Version
-	var rev string
-	var dirty bool
-	for _, s := range info.Settings {
-		switch s.Key {
-		case "vcs.revision":
-			rev = s.Value
-		case "vcs.modified":
-			dirty = s.Value == "true"
-		}
-	}
-	if v == "" || v == "(devel)" {
-		if rev == "" {
-			return "devel"
-		}
-		short := rev
-		if len(short) > 12 {
-			short = short[:12]
-		}
-		if dirty {
-			short += "+dirty"
-		}
-		return "devel " + short
-	}
-	return v
 }
 
 func resolveConfigPath(flagVal string) string {

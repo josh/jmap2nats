@@ -1,13 +1,10 @@
 FROM golang:1.25.9-alpine3.23@sha256:5caaf1cca9dc351e13deafbc3879fd4754801acba8653fa9540cea125d01a71f AS builder
 
-RUN apk add --no-cache git
-
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -mod=readonly -ldflags="-s -w" -o jmap2nats .
-RUN ./jmap2nats version
 
 FROM scratch
 
