@@ -58,7 +58,7 @@ Example `jmap2nats.json`:
   "stream": {
     "name": "JMAP_EMAILS",
     "subject_prefix": "jmap.email",
-    "retention": "168h",
+    "max_age": "168h",
     "max_bytes": "64MiB",
     "dedup_window": "24h"
   },
@@ -80,7 +80,7 @@ Example `jmap2nats.json`:
 | `nats.creds`            | unset                   | Path to a NATS creds file (NGS etc).               |
 | `stream.name`           | `JMAP_EMAILS`           |                                                    |
 | `stream.subject_prefix` | `jmap.email`            | Subject = `<prefix>.<accountId>.<emailId>`.        |
-| `stream.retention`      | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.     |
+| `stream.max_age`        | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.     |
 | `stream.max_bytes`      | `64MiB`                 | Sizes accept `KiB`/`MiB`/`GiB`.                    |
 | `stream.dedup_window`   | `24h`                   | Server-side `Nats-Msg-Id` dedup window.            |
 | `parts.bucket`          | `email-parts`           | Object Store bucket for all body/attachment parts. |

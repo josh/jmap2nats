@@ -31,7 +31,7 @@ type NATSConfig struct {
 type StreamConfig struct {
 	Name          string   `json:"name"`
 	SubjectPrefix string   `json:"subject_prefix"`
-	Retention     Duration `json:"retention"`
+	MaxAge        Duration `json:"max_age"`
 	MaxBytes      Bytes    `json:"max_bytes"`
 	DedupWindow   Duration `json:"dedup_window"`
 }
@@ -50,7 +50,7 @@ func defaultConfig() Config {
 		Stream: StreamConfig{
 			Name:          "JMAP_EMAILS",
 			SubjectPrefix: "jmap.email",
-			Retention:     Duration(7 * 24 * time.Hour),
+			MaxAge:        Duration(7 * 24 * time.Hour),
 			MaxBytes:      64 * MiB,
 			DedupWindow:   Duration(24 * time.Hour),
 		},
@@ -100,8 +100,8 @@ func (c Config) validate() error {
 	if c.Parts.MaxBytes <= 0 || c.Parts.MaxPerPart <= 0 {
 		return fmt.Errorf("parts.max_bytes and parts.max_per_part must be positive")
 	}
-	if c.Stream.Retention <= 0 {
-		return fmt.Errorf("stream.retention must be positive")
+	if c.Stream.MaxAge <= 0 {
+		return fmt.Errorf("stream.max_age must be positive")
 	}
 	if c.BackfillLimit == 0 {
 		return fmt.Errorf("backfill_limit must be positive")

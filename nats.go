@@ -43,7 +43,7 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 		Retention:  jetstream.LimitsPolicy,
 		Discard:    jetstream.DiscardOld,
 		Storage:    jetstream.FileStorage,
-		MaxAge:     cfg.Stream.Retention.Duration(),
+		MaxAge:     cfg.Stream.MaxAge.Duration(),
 		MaxBytes:   cfg.Stream.MaxBytes.Int64(),
 		Duplicates: cfg.Stream.DedupWindow.Duration(),
 	})
@@ -54,14 +54,14 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 	log.Info("stream ready",
 		"name", cfg.Stream.Name,
 		"subjects", cfg.Stream.SubjectPrefix+".>",
-		"max_age", cfg.Stream.Retention.Duration(),
+		"max_age", cfg.Stream.MaxAge.Duration(),
 		"max_bytes", cfg.Stream.MaxBytes,
 		"dedup_window", cfg.Stream.DedupWindow.Duration(),
 	)
 
 	parts, err := js.CreateOrUpdateObjectStore(ctx, jetstream.ObjectStoreConfig{
 		Bucket:   cfg.Parts.Bucket,
-		TTL:      cfg.Stream.Retention.Duration(),
+		TTL:      cfg.Stream.MaxAge.Duration(),
 		MaxBytes: cfg.Parts.MaxBytes.Int64(),
 		Storage:  jetstream.FileStorage,
 	})
@@ -71,7 +71,7 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 	}
 	log.Info("object store ready",
 		"bucket", cfg.Parts.Bucket,
-		"ttl", cfg.Stream.Retention.Duration(),
+		"ttl", cfg.Stream.MaxAge.Duration(),
 		"max_bytes", cfg.Parts.MaxBytes,
 	)
 
