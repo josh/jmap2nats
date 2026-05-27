@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -107,6 +108,18 @@ func (n *NATSResources) Close() {
 	}
 }
 
+func (n *NATSResources) LastPublishedEmailID(ctx context.Context, accountID string) (string, error) {
+	subject := fmt.Sprintf("%s.%s", n.cfg.Stream.SubjectPrefix, accountID)
+	msg, err := n.stream.GetLastMsgForSubject(ctx, subject)
+	if err != nil {
+		if errors.Is(err, jetstream.ErrMsgNotFound) {
+			return "", nil
+		}
+		return "", fmt.Errorf("get last msg for %s: %w", subject, err)
+	}
+	return msg.Header.Get(nats.MsgIdHdr), nil
+}
+
 func (n *NATSResources) PutPart(ctx context.Context, emailID, blobID string, r io.Reader) (string, error) {
 	key := emailID + "/" + blobID
 	_, err := n.parts.Put(ctx, jetstream.ObjectMeta{Name: key}, r)
@@ -117,7 +130,7 @@ func (n *NATSResources) PutPart(ctx context.Context, emailID, blobID string, r i
 }
 
 func (n *NATSResources) Publish(ctx context.Context, env *envelope, body []byte) (bool, error) {
-	subject := fmt.Sprintf("%s.%s.%s", n.cfg.Stream.SubjectPrefix, env.AccountID, env.Email.ID)
+	subject := fmt.Sprintf("%s.%s", n.cfg.Stream.SubjectPrefix, env.AccountID)
 	msg := &nats.Msg{
 		Subject: subject,
 		Data:    body,

@@ -4,12 +4,13 @@ A small Go service that subscribes to a JMAP email server's push stream
 and republishes newly-arrived emails onto a NATS JetStream stream.
 
 - **Real-time** via JMAP's `EventSource` (server-sent events). No polling.
-- **HA-safe**: run multiple replicas — JetStream message-id deduplication
-  ensures each email lands on the stream once.
-- **Outage-tolerant**: on boot the service re-checks the last N most-recent
-  emails; anything still in the dedup window is dropped server-side as a
-  duplicate, anything new is delivered. Messages are missed only if more
-  than N arrived during downtime (default N = 100).
+- **HA-safe**: run multiple replicas — every publish carries a `Nats-Msg-Id`
+  set to the JMAP email id, so concurrent publishes from different replicas
+  are deduplicated server-side within the stream's `DuplicateWindow`.
+- **Outage-tolerant**: on boot the service finds the most-recent email
+  already in the stream and re-checks any newer JMAP ids up to
+  `backfill_limit`. Messages are missed only if more than `backfill_limit`
+  arrived during downtime (default 100).
 - **JMAP-faithful** payload: the NATS message body is the JMAP `Email`
   object as JSON (RFC 8621 field names), with body/attachment bytes
   externalised to an Object Store and referenced by key.
@@ -71,23 +72,23 @@ Example `jmap2nats.json`:
 }
 ```
 
-| JSON path                   | Default                 | Notes                                                                                                                 |
-| --------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `jmap.session_url`          | (required)              | e.g. `https://api.fastmail.com/jmap/session`                                                                          |
-| `jmap.token_file`           | (required)              | Path to a file containing the bearer token. Trailing whitespace is trimmed. Keep mode 0400.                           |
-| `jmap.account_id`           | primary mail account    | Override if not the session primary.                                                                                  |
-| `nats.url`                  | `nats://localhost:4222` |                                                                                                                       |
-| `nats.creds`                | unset                   | Path to a NATS creds file (NGS etc).                                                                                  |
-| `stream.name`               | `JMAP_EMAILS`           |                                                                                                                       |
-| `stream.subject_prefix`     | `jmap.email`            | Subject = `<prefix>.<accountId>.<emailId>`.                                                                           |
-| `stream.max_age`            | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.                                                                        |
-| `stream.max_bytes`          | `64MiB`                 | Sizes accept `KiB`/`MiB`/`GiB`.                                                                                       |
-| `stream.dedup_window`       | `24h`                   | Server-side `Nats-Msg-Id` dedup window.                                                                               |
-| `stream.externally_managed` | `false`                 | Skip create/update; only verify the stream exists. Set true when another operator (e.g. NACK) owns the stream config. |
-| `parts.bucket`              | `email-parts`           | Object Store bucket for all body/attachment parts.                                                                    |
-| `parts.max_bytes`           | `960MiB`                | Bucket cap.                                                                                                           |
-| `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                               |
-| `backfill_limit`            | `100`                   | N most-recent emails to re-check on boot.                                                                             |
+| JSON path                   | Default                 | Notes                                                                                                                                       |
+| --------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jmap.session_url`          | (required)              | e.g. `https://api.fastmail.com/jmap/session`                                                                                                |
+| `jmap.token_file`           | (required)              | Path to a file containing the bearer token. Trailing whitespace is trimmed. Keep mode 0400.                                                 |
+| `jmap.account_id`           | primary mail account    | Override if not the session primary.                                                                                                        |
+| `nats.url`                  | `nats://localhost:4222` |                                                                                                                                             |
+| `nats.creds`                | unset                   | Path to a NATS creds file (NGS etc).                                                                                                        |
+| `stream.name`               | `JMAP_EMAILS`           |                                                                                                                                             |
+| `stream.subject_prefix`     | `jmap.email`            | Subject = `<prefix>.<accountId>`.                                                                                                           |
+| `stream.max_age`            | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.                                                                                              |
+| `stream.max_bytes`          | `64MiB`                 | Sizes accept `KiB`/`MiB`/`GiB`.                                                                                                             |
+| `stream.dedup_window`       | `24h`                   | Server-side `Nats-Msg-Id` dedup window. Catches concurrent HA publishes; boot-time republishes are gated separately by the high-water mark. |
+| `stream.externally_managed` | `false`                 | Skip create/update; only verify the stream exists. Set true when another operator (e.g. NACK) owns the stream config.                       |
+| `parts.bucket`              | `email-parts`           | Object Store bucket for all body/attachment parts.                                                                                          |
+| `parts.max_bytes`           | `960MiB`                | Bucket cap.                                                                                                                                 |
+| `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                                                     |
+| `backfill_limit`            | `100`                   | N most-recent emails to re-check on boot.                                                                                                   |
 
 Total default storage footprint ≈ 1 GiB (64 MiB stream + 960 MiB parts).
 
@@ -108,15 +109,20 @@ The service:
 4. Opens a JMAP `EventSource` SSE connection and republishes every newly
    created email as it arrives.
 
-For HA, run several copies pointed at the same NATS cluster. Duplicate
-publishes (same JMAP email id) are dropped by the stream's dedup window.
+For HA, run several copies pointed at the same NATS cluster. Concurrent
+publishes (same JMAP email id from different replicas) are rejected by
+the stream's `Nats-Msg-Id` dedup window; on boot, each replica reads the
+most-recent published email per account and skips anything already in the
+stream, so backfill work isn't repeated across restarts.
 
 ## Data model
 
 Each email becomes one NATS message:
 
-- **Subject**: `<prefix>.<accountId>.<emailId>` (defaults to
-  `jmap.email.<accountId>.<emailId>`).
+- **Subject**: `<prefix>.<accountId>` (defaults to `jmap.email.<accountId>`).
+  All emails for an account share one subject; the emailId is carried in
+  the `Nats-Msg-Id` and `Jmap-Email-Id` headers and in the JSON body's
+  `id` field, not in the subject.
 - **`Nats-Msg-Id` header**: the JMAP email id, used for dedup.
 - **Other headers** (filterable without parsing the body):
   - `Jmap-Account-Id`, `Jmap-Email-Id`, `Jmap-Thread-Id`

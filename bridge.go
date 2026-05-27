@@ -294,6 +294,10 @@ func (b *Bridge) Run(ctx context.Context) error {
 var errCannotCalculate = errors.New("cannotCalculateChanges")
 
 func (b *Bridge) bootRecover(ctx context.Context) (string, error) {
+	highWater, err := b.nr.LastPublishedEmailID(ctx, string(b.jc.AccountID()))
+	if err != nil {
+		b.log.Warn("boot recovery: high-water lookup failed; processing full window", "err", err)
+	}
 	ids, err := b.jc.QueryRecent(b.cfg.BackfillLimit)
 	if err != nil {
 		return "", err
@@ -302,14 +306,24 @@ func (b *Bridge) bootRecover(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	b.log.Info("boot recovery", "ids_to_check", len(ids), "state", state)
-	for _, id := range ids {
+	b.log.Info("boot recovery", "ids_to_check", len(ids), "state", state, "high_water", highWater)
+	reached := false
+	for i, id := range ids {
 		if ctx.Err() != nil {
 			return state, ctx.Err()
+		}
+		if highWater != "" && string(id) == highWater {
+			b.log.Info("boot recovery: reached high-water mark", "processed", i, "skipped", len(ids)-i)
+			reached = true
+			break
 		}
 		if err := b.processOne(ctx, id); err != nil {
 			b.log.Error("boot recovery: process failed", "id", id, "err", err)
 		}
+	}
+	if highWater != "" && !reached {
+		b.log.Warn("boot recovery: high-water mark not found in backfill window; consider raising backfill_limit",
+			"high_water", highWater, "backfill_limit", b.cfg.BackfillLimit)
 	}
 	return state, nil
 }

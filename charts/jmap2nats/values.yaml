@@ -58,7 +58,7 @@ nack:
     replicas: 1
     compression: s2
     maxMsgSize: 1048576
-    maxMsgsPerSubject: 1
+    maxMsgsPerSubject: -1
 
 serviceAccount:
   create: true
