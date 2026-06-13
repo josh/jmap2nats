@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	"os"
-	"strings"
 
 	"git.sr.ht/~rockorager/go-jmap"
 	"git.sr.ht/~rockorager/go-jmap/mail"
@@ -21,13 +19,9 @@ type JMAPClient struct {
 }
 
 func NewJMAPClient(cfg Config, log *slog.Logger) (*JMAPClient, error) {
-	tokenBytes, err := os.ReadFile(cfg.JMAP.TokenFile)
+	token, err := readSecretFile(cfg.JMAP.TokenFile)
 	if err != nil {
-		return nil, fmt.Errorf("jmap read token_file %s: %w", cfg.JMAP.TokenFile, err)
-	}
-	token := strings.TrimSpace(string(tokenBytes))
-	if token == "" {
-		return nil, fmt.Errorf("jmap token_file %s is empty", cfg.JMAP.TokenFile)
+		return nil, fmt.Errorf("jmap token_file: %w", err)
 	}
 
 	client := &jmap.Client{SessionEndpoint: cfg.JMAP.SessionURL}

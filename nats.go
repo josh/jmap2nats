@@ -25,15 +25,21 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 		nats.MaxReconnects(-1),
 		nats.RetryOnFailedConnect(true),
 	}
-	if cfg.NATS.NkeySeedFile != "" {
+	switch {
+	case cfg.NATS.User != "":
+		password, err := readSecretFile(cfg.NATS.PasswordFile)
+		if err != nil {
+			return nil, fmt.Errorf("nats password_file: %w", err)
+		}
+		opts = append(opts, nats.UserInfo(cfg.NATS.User, password))
+	case cfg.NATS.Creds != "":
+		opts = append(opts, nats.UserCredentials(cfg.NATS.Creds))
+	case cfg.NATS.NkeySeedFile != "":
 		opt, err := nats.NkeyOptionFromSeed(cfg.NATS.NkeySeedFile)
 		if err != nil {
 			return nil, fmt.Errorf("load nats nkey: %w", err)
 		}
 		opts = append(opts, opt)
-	}
-	if cfg.NATS.Creds != "" {
-		opts = append(opts, nats.UserCredentials(cfg.NATS.Creds))
 	}
 	conn, err := nats.Connect(cfg.NATS.URL, opts...)
 	if err != nil {

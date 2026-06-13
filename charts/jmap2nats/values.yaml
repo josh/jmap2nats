@@ -15,6 +15,7 @@ config:
     account_id: ""
   nats:
     url: "nats://nats:4222"
+    user: ""
     creds: ""
   stream:
     name: "JMAP_EMAILS"
@@ -37,14 +38,19 @@ auth:
   jmap:
     secretName: ""
     secretKey: token
-  # Optional NATS user NKEY seed (enables NKEY-based NATS authentication).
-  # Set nats.secretKey to enable. nats.secretName defaults to jmap.secretName
-  # when empty, so the seed can live in the same Secret as the JMAP token or
-  # a separate one. The seed is mounted at /etc/jmap2nats/secrets/nats.nk and
-  # nats.nkey_seed_file is injected into the rendered config.json.
+  # Optional NATS authentication (choose at most one of NKEY or user/password).
+  # nats.secretName defaults to jmap.secretName when empty, so the material can
+  # live in the same Secret as the JMAP token or a dedicated NATS Secret.
+  #
+  # NKEY: set nats.secretKey. The seed is mounted at /etc/jmap2nats/secrets/nats.nk
+  #   and nats.nkey_seed_file is injected into the rendered config.json.
+  # User/password: set nats.passwordKey (and config.nats.user). The password is
+  #   mounted at /etc/jmap2nats/secrets/nats.password and nats.password_file is
+  #   injected into the rendered config.json.
   nats:
     secretName: ""
     secretKey: ""
+    passwordKey: ""
 
 nack:
   # Render a NACK Stream CRD (jetstream.nats.io/v1beta2). Requires the NACK

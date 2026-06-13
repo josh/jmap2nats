@@ -78,7 +78,10 @@ Example `jmap2nats.json`:
 | `jmap.token_file`           | (required)              | Path to a file containing the bearer token. Trailing whitespace is trimmed. Keep mode 0400.                                                 |
 | `jmap.account_id`           | primary mail account    | Override if not the session primary.                                                                                                        |
 | `nats.url`                  | `nats://localhost:4222` |                                                                                                                                             |
+| `nats.user`                 | unset                   | NATS username; set together with `nats.password_file`.                                                                                      |
+| `nats.password_file`        | unset                   | Path to a file containing the NATS password. Trailing whitespace is trimmed.                                                                |
 | `nats.creds`                | unset                   | Path to a NATS creds file (NGS etc).                                                                                                        |
+| `nats.nkey_seed_file`       | unset                   | Path to a NATS nkey seed file.                                                                                                              |
 | `stream.name`               | `JMAP_EMAILS`           |                                                                                                                                             |
 | `stream.subject_prefix`     | `jmap.email`            | Subject = `<prefix>.<accountId>`.                                                                                                           |
 | `stream.max_age`            | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.                                                                                              |
@@ -89,6 +92,9 @@ Example `jmap2nats.json`:
 | `parts.max_bytes`           | `960MiB`                | Bucket cap.                                                                                                                                 |
 | `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                                                     |
 | `backfill_limit`            | `100`                   | N most-recent emails to re-check on boot.                                                                                                   |
+
+NATS authentication is optional; configure at most one of `nats.user` + `nats.password_file`,
+`nats.creds`, or `nats.nkey_seed_file` (otherwise the connection is anonymous).
 
 Total default storage footprint ≈ 1 GiB (64 MiB stream + 960 MiB parts).
 

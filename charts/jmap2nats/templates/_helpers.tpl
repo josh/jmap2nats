@@ -80,6 +80,9 @@ won't fight NACK over the stream's spec on startup.
 {{- if .Values.auth.nats.secretKey -}}
 {{- $_ := set $cfg.nats "nkey_seed_file" "/etc/jmap2nats/secrets/nats.nk" -}}
 {{- end -}}
+{{- if .Values.auth.nats.passwordKey -}}
+{{- $_ := set $cfg.nats "password_file" "/etc/jmap2nats/secrets/nats.password" -}}
+{{- end -}}
 {{- if and .Values.nack.enabled (not (hasKey $cfg.stream "externally_managed")) -}}
 {{- $_ := set $cfg.stream "externally_managed" true -}}
 {{- end -}}

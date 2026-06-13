@@ -25,6 +25,8 @@ type JMAPConfig struct {
 
 type NATSConfig struct {
 	URL          string `json:"url"`
+	User         string `json:"user"`
+	PasswordFile string `json:"password_file"`
 	Creds        string `json:"creds"`
 	NkeySeedFile string `json:"nkey_seed_file"`
 }
@@ -90,6 +92,18 @@ func (c Config) validate() error {
 	if c.NATS.URL == "" {
 		return fmt.Errorf("nats.url is required")
 	}
+	if (c.NATS.User == "") != (c.NATS.PasswordFile == "") {
+		return fmt.Errorf("nats.user and nats.password_file must be set together")
+	}
+	methods := 0
+	for _, on := range []bool{c.NATS.User != "", c.NATS.Creds != "", c.NATS.NkeySeedFile != ""} {
+		if on {
+			methods++
+		}
+	}
+	if methods > 1 {
+		return fmt.Errorf("nats: choose at most one of user/password_file, creds, or nkey_seed_file")
+	}
 	if c.Stream.Name == "" || c.Stream.SubjectPrefix == "" {
 		return fmt.Errorf("stream.name and stream.subject_prefix are required")
 	}
@@ -109,6 +123,20 @@ func (c Config) validate() error {
 		return fmt.Errorf("backfill_limit must be positive")
 	}
 	return nil
+}
+
+// readSecretFile reads a secret from a file, trimming surrounding whitespace and
+// rejecting empty contents. Shared by the JMAP token and the NATS password.
+func readSecretFile(path string) (string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", path, err)
+	}
+	s := strings.TrimSpace(string(b))
+	if s == "" {
+		return "", fmt.Errorf("%s is empty", path)
+	}
+	return s, nil
 }
 
 type Duration time.Duration
