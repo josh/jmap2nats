@@ -66,6 +66,19 @@ nack:
     maxMsgSize: 1048576
     maxMsgsPerSubject: -1
 
+# Optionally render a NACK Account CRD (jetstream.nats.io/v1beta2 kind: Account) so the
+# managed Stream (and externally-managed consumers in the same namespace) can target a
+# non-default NATS account via spec.account. The Account CRD is connection-config only; it
+# does NOT create the NATS account server-side. When account.name is set, the Account CRD is
+# rendered and the Stream's spec.account is set to it. Credentials reuse the NATS auth Secret
+# (user/password).
+account:
+  name: ""          # Account CRD metadata.name + spec.name; "" disables rendering.
+  servers: []       # defaults to [ config.nats.url ]
+  secretName: ""    # Secret with the user+password; defaults to auth.nats.secretName | auth.jmap.secretName
+  userKey: ""       # Secret key holding the NATS username
+  passwordKey: ""   # Secret key holding the password; defaults to auth.nats.passwordKey
+
 serviceAccount:
   create: true
   name: ""

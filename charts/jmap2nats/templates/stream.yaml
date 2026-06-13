@@ -6,6 +6,9 @@ metadata:
   labels:
     {{- include "jmap2nats.labels" . | nindent 4 }}
 spec:
+  {{- with .Values.account.name }}
+  account: {{ . | quote }}
+  {{- end }}
   name: {{ .Values.config.stream.name | quote }}
   subjects:
     - {{ printf "%s.>" .Values.config.stream.subject_prefix | quote }}
