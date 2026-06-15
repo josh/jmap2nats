@@ -78,10 +78,11 @@ Example `jmap2nats.json`:
 | `jmap.token_file`           | (required)              | Path to a file containing the bearer token. Trailing whitespace is trimmed. Keep mode 0400.                                                 |
 | `jmap.account_id`           | primary mail account    | Override if not the session primary.                                                                                                        |
 | `nats.url`                  | `nats://localhost:4222` |                                                                                                                                             |
+| `nats.token_file`           | unset                   | Path to a file containing a NATS auth token. Trailing whitespace is trimmed.                                                                |
 | `nats.user`                 | unset                   | NATS username; set together with `nats.password_file`.                                                                                      |
-| `nats.password_file`        | unset                   | Path to a file containing the NATS password. Trailing whitespace is trimmed.                                                                |
-| `nats.creds`                | unset                   | Path to a NATS creds file (NGS etc).                                                                                                        |
-| `nats.nkey_seed_file`       | unset                   | Path to a NATS nkey seed file.                                                                                                              |
+| `nats.password_file`        | unset                   | Path to a file containing the NATS password (plaintext, even when the server stores a bcrypt hash). Trailing whitespace is trimmed.         |
+| `nats.creds_file`           | unset                   | Path to a NATS creds file (decentralized JWT / NGS); the `nsc`-generated bundle of the user JWT + signing nkey seed.                         |
+| `nats.nkey_seed_file`       | unset                   | Path to a NATS nkey seed file. The seed signs the server's challenge.                                                                        |
 | `stream.name`               | `JMAP_EMAILS`           |                                                                                                                                             |
 | `stream.subject_prefix`     | `jmap.email`            | Subject = `<prefix>.<accountId>`.                                                                                                           |
 | `stream.max_age`            | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.                                                                                              |
@@ -93,8 +94,18 @@ Example `jmap2nats.json`:
 | `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                                                     |
 | `backfill_limit`            | `100`                   | N most-recent emails to re-check on boot.                                                                                                   |
 
-NATS authentication is optional; configure at most one of `nats.user` + `nats.password_file`,
-`nats.creds`, or `nats.nkey_seed_file` (otherwise the connection is anonymous).
+NATS authentication is optional; configure at most one of `nats.token_file`,
+`nats.user` + `nats.password_file`, `nats.creds_file`, or `nats.nkey_seed_file`
+(otherwise the connection is anonymous). Every secret is referenced by file
+path — nothing is read from an environment variable or CLI flag.
+
+- **Token**: `nats.token_file`.
+- **Username/password** (plaintext *and* bcrypted): `nats.user` +
+  `nats.password_file`. Bcrypt is a server-side storage concern — the client
+  always sends the plaintext password, so the same config covers both.
+- **Decentralized JWT**: `nats.creds_file`, the `nsc`-generated creds file
+  (operator/account/user JWT + signing nkey).
+- **NKEY**: `nats.nkey_seed_file`; the seed signs the server's challenge.
 
 Total default storage footprint ≈ 1 GiB (64 MiB stream + 960 MiB parts).
 

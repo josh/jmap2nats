@@ -77,11 +77,17 @@ won't fight NACK over the stream's spec on startup.
 {{- define "jmap2nats.configJson" -}}
 {{- $cfg := deepCopy .Values.config -}}
 {{- $_ := set $cfg.jmap "token_file" "/etc/jmap2nats/secrets/token" -}}
-{{- if .Values.auth.nats.secretKey -}}
-{{- $_ := set $cfg.nats "nkey_seed_file" "/etc/jmap2nats/secrets/nats.nk" -}}
+{{- if .Values.auth.nats.tokenKey -}}
+{{- $_ := set $cfg.nats "token_file" "/etc/jmap2nats/secrets/nats.token" -}}
 {{- end -}}
 {{- if .Values.auth.nats.passwordKey -}}
 {{- $_ := set $cfg.nats "password_file" "/etc/jmap2nats/secrets/nats.password" -}}
+{{- end -}}
+{{- if .Values.auth.nats.credsKey -}}
+{{- $_ := set $cfg.nats "creds_file" "/etc/jmap2nats/secrets/nats.creds" -}}
+{{- end -}}
+{{- if .Values.auth.nats.secretKey -}}
+{{- $_ := set $cfg.nats "nkey_seed_file" "/etc/jmap2nats/secrets/nats.nk" -}}
 {{- end -}}
 {{- if and .Values.nack.enabled (not (hasKey $cfg.stream "externally_managed")) -}}
 {{- $_ := set $cfg.stream "externally_managed" true -}}

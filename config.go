@@ -25,9 +25,10 @@ type JMAPConfig struct {
 
 type NATSConfig struct {
 	URL          string `json:"url"`
+	TokenFile    string `json:"token_file"`
 	User         string `json:"user"`
 	PasswordFile string `json:"password_file"`
-	Creds        string `json:"creds"`
+	CredsFile    string `json:"creds_file"`
 	NkeySeedFile string `json:"nkey_seed_file"`
 }
 
@@ -96,13 +97,13 @@ func (c Config) validate() error {
 		return fmt.Errorf("nats.user and nats.password_file must be set together")
 	}
 	methods := 0
-	for _, on := range []bool{c.NATS.User != "", c.NATS.Creds != "", c.NATS.NkeySeedFile != ""} {
+	for _, on := range []bool{c.NATS.TokenFile != "", c.NATS.User != "", c.NATS.CredsFile != "", c.NATS.NkeySeedFile != ""} {
 		if on {
 			methods++
 		}
 	}
 	if methods > 1 {
-		return fmt.Errorf("nats: choose at most one of user/password_file, creds, or nkey_seed_file")
+		return fmt.Errorf("nats: choose at most one of token_file, user/password_file, creds_file, or nkey_seed_file")
 	}
 	if c.Stream.Name == "" || c.Stream.SubjectPrefix == "" {
 		return fmt.Errorf("stream.name and stream.subject_prefix are required")

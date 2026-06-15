@@ -59,12 +59,12 @@ spec:
                   items:
                     - key: {{ .Values.auth.jmap.secretKey }}
                       path: token
-              {{- if .Values.auth.nats.secretKey }}
+              {{- if .Values.auth.nats.tokenKey }}
               - secret:
                   name: {{ .Values.auth.nats.secretName | default .Values.auth.jmap.secretName | quote }}
                   items:
-                    - key: {{ .Values.auth.nats.secretKey }}
-                      path: nats.nk
+                    - key: {{ .Values.auth.nats.tokenKey }}
+                      path: nats.token
               {{- end }}
               {{- if .Values.auth.nats.passwordKey }}
               - secret:
@@ -72,6 +72,20 @@ spec:
                   items:
                     - key: {{ .Values.auth.nats.passwordKey }}
                       path: nats.password
+              {{- end }}
+              {{- if .Values.auth.nats.credsKey }}
+              - secret:
+                  name: {{ .Values.auth.nats.secretName | default .Values.auth.jmap.secretName | quote }}
+                  items:
+                    - key: {{ .Values.auth.nats.credsKey }}
+                      path: nats.creds
+              {{- end }}
+              {{- if .Values.auth.nats.secretKey }}
+              - secret:
+                  name: {{ .Values.auth.nats.secretName | default .Values.auth.jmap.secretName | quote }}
+                  items:
+                    - key: {{ .Values.auth.nats.secretKey }}
+                      path: nats.nk
               {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
