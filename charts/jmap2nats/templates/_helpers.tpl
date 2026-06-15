@@ -69,24 +69,170 @@ Explicit image.tag overrides pass through.
 {{- end -}}
 
 {{/*
-Rendered config.json content. Merges the chart-owned token_file path into the
-user's .Values.config block. When nack.enabled is true (and the user hasn't
-overridden it), also injects stream.externally_managed: true so the binary
-won't fight NACK over the stream's spec on startup.
+The app's NATS auth method: token | user | creds | nkey | none. Determined by
+which secrets.nats method block is populated (the connection is anonymous when
+none is).
+*/}}
+{{- define "jmap2nats.natsMethod" -}}
+{{- $n := .Values.secrets.nats -}}
+{{- if $n.token.token -}}token
+{{- else if or $n.user.user $n.user.password -}}user
+{{- else if $n.creds.file -}}creds
+{{- else if $n.nkey.seed -}}nkey
+{{- else -}}none
+{{- end -}}
+{{- end -}}
+
+{{/*
+Count of populated secrets.nats method blocks (for validation).
+*/}}
+{{- define "jmap2nats.natsMethodCount" -}}
+{{- $n := .Values.secrets.nats -}}
+{{- $c := 0 -}}
+{{- if $n.token.token -}}{{- $c = add1 $c -}}{{- end -}}
+{{- if or $n.user.user $n.user.password -}}{{- $c = add1 $c -}}{{- end -}}
+{{- if $n.creds.file -}}{{- $c = add1 $c -}}{{- end -}}
+{{- if $n.nkey.seed -}}{{- $c = add1 $c -}}{{- end -}}
+{{- $c -}}
+{{- end -}}
+
+{{/*
+Count of populated secrets.nack method blocks (for validation / mirror logic).
+*/}}
+{{- define "jmap2nats.nackMethodCount" -}}
+{{- $n := .Values.secrets.nack -}}
+{{- $c := 0 -}}
+{{- if $n.token.token -}}{{- $c = add1 $c -}}{{- end -}}
+{{- if or $n.user.user $n.user.password -}}{{- $c = add1 $c -}}{{- end -}}
+{{- if $n.creds.file -}}{{- $c = add1 $c -}}{{- end -}}
+{{- if $n.nkey.seed -}}{{- $c = add1 $c -}}{{- end -}}
+{{- $c -}}
+{{- end -}}
+
+{{/*
+The effective Secret name backing the app's NATS auth (the active method's
+secret.name, defaulting to the JMAP token Secret).
+*/}}
+{{- define "jmap2nats.natsSecretName" -}}
+{{- $method := include "jmap2nats.natsMethod" . | trim -}}
+{{- if ne $method "none" -}}
+{{- $b := index .Values.secrets.nats $method -}}
+{{- $b.secret.name | default .Values.secrets.jmap.secret.name -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The NACK Account CRD auth method: a populated secrets.nack block, otherwise it
+mirrors the app's NATS method.
+*/}}
+{{- define "jmap2nats.accountMethod" -}}
+{{- $a := .Values.secrets.nack -}}
+{{- if $a.token.token -}}token
+{{- else if or $a.user.user $a.user.password -}}user
+{{- else if $a.creds.file -}}creds
+{{- else if $a.nkey.seed -}}nkey
+{{- else -}}{{- include "jmap2nats.natsMethod" . | trim -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The Account CRD auth block (spec.token / spec.user / spec.creds / spec.nkey).
+Uses secrets.nack when populated, otherwise mirrors secrets.nats verbatim.
+Emits nothing for an anonymous (none) method. Maps value field names to the
+CRD's field names (creds.file, nkey.seed, ...).
+*/}}
+{{- define "jmap2nats.accountUser" -}}
+{{- $jmapName := .Values.secrets.jmap.secret.name -}}
+{{- $method := include "jmap2nats.accountMethod" . | trim -}}
+{{- $nackCount := include "jmap2nats.nackMethodCount" . | int -}}
+{{- if ne $method "none" -}}
+{{- $b := dict -}}
+{{- $name := "" -}}
+{{- if gt $nackCount 0 -}}
+{{- $b = index .Values.secrets.nack $method -}}
+{{- $name = $b.secret.name | default (index .Values.secrets.nats $method).secret.name | default $jmapName -}}
+{{- else -}}
+{{- $b = index .Values.secrets.nats $method -}}
+{{- $name = $b.secret.name | default $jmapName -}}
+{{- end -}}
+{{- if eq $method "token" -}}
+token:
+  secret:
+    name: {{ $name | quote }}
+  token: {{ $b.token | quote }}
+{{- else if eq $method "user" -}}
+user:
+  secret:
+    name: {{ $name | quote }}
+  user: {{ $b.user | quote }}
+  password: {{ $b.password | quote }}
+{{- else if eq $method "creds" -}}
+creds:
+  secret:
+    name: {{ $name | quote }}
+  file: {{ $b.file | quote }}
+{{- else if eq $method "nkey" -}}
+nkey:
+  secret:
+    name: {{ $name | quote }}
+  seed: {{ $b.seed | quote }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Fail-fast validation of the secrets / nack configuration. Included from
+configmap.yaml so any render path triggers it.
+*/}}
+{{- define "jmap2nats.validate" -}}
+{{- if not .Values.secrets.jmap.secret.name -}}
+{{- fail "secrets.jmap.secret.name is required (the Secret holding the JMAP bearer token)" -}}
+{{- end -}}
+{{- if not .Values.secrets.jmap.token -}}
+{{- fail "secrets.jmap.token is required (the key in the Secret holding the bearer token)" -}}
+{{- end -}}
+{{- if gt (include "jmap2nats.natsMethodCount" . | int) 1 -}}
+{{- fail "secrets.nats: set at most one auth method (token, user, creds, or nkey)" -}}
+{{- end -}}
+{{- $u := .Values.secrets.nats.user -}}
+{{- if and (or $u.user $u.password) (not (and $u.user $u.password)) -}}
+{{- fail "secrets.nats.user: set both the user and password keys" -}}
+{{- end -}}
+{{- $nackCount := include "jmap2nats.nackMethodCount" . | int -}}
+{{- if gt $nackCount 1 -}}
+{{- fail "secrets.nack: set at most one auth method (token, user, creds, or nkey)" -}}
+{{- end -}}
+{{- $nu := .Values.secrets.nack.user -}}
+{{- if and (or $nu.user $nu.password) (not (and $nu.user $nu.password)) -}}
+{{- fail "secrets.nack.user: set both the user and password keys" -}}
+{{- end -}}
+{{- if and .Values.nack.account.name (not .Values.nack.enabled) -}}
+{{- fail "nack.account.name is set but nack.enabled is false; enable NACK or clear the account name" -}}
+{{- end -}}
+{{- if and (gt $nackCount 0) (not .Values.nack.account.name) -}}
+{{- fail "secrets.nack is populated but nack.account.name is empty; set nack.account.name or clear secrets.nack" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Rendered config.json content. Merges the chart-owned auth file paths into the
+user's .Values.config block based on the selected secrets.nats method. When
+nack.enabled is true (and the user hasn't overridden it), also injects
+stream.externally_managed: true so the binary won't fight NACK over the
+stream's spec on startup.
 */}}
 {{- define "jmap2nats.configJson" -}}
 {{- $cfg := deepCopy .Values.config -}}
 {{- $_ := set $cfg.jmap "token_file" "/etc/jmap2nats/secrets/token" -}}
-{{- if .Values.auth.nats.tokenKey -}}
+{{- $method := include "jmap2nats.natsMethod" . | trim -}}
+{{- if eq $method "token" -}}
 {{- $_ := set $cfg.nats "token_file" "/etc/jmap2nats/secrets/nats.token" -}}
-{{- end -}}
-{{- if .Values.auth.nats.passwordKey -}}
+{{- else if eq $method "user" -}}
+{{- $_ := set $cfg.nats "user_file" "/etc/jmap2nats/secrets/nats.user" -}}
 {{- $_ := set $cfg.nats "password_file" "/etc/jmap2nats/secrets/nats.password" -}}
-{{- end -}}
-{{- if .Values.auth.nats.credsKey -}}
+{{- else if eq $method "creds" -}}
 {{- $_ := set $cfg.nats "creds_file" "/etc/jmap2nats/secrets/nats.creds" -}}
-{{- end -}}
-{{- if .Values.auth.nats.secretKey -}}
+{{- else if eq $method "nkey" -}}
 {{- $_ := set $cfg.nats "nkey_seed_file" "/etc/jmap2nats/secrets/nats.nk" -}}
 {{- end -}}
 {{- if and .Values.nack.enabled (not (hasKey $cfg.stream "externally_managed")) -}}

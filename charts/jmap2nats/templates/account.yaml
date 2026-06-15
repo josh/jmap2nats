@@ -1,21 +1,17 @@
-{{- if .Values.account.name }}
+{{- if and .Values.nack.enabled .Values.nack.account.name }}
 apiVersion: jetstream.nats.io/v1beta2
 kind: Account
 metadata:
-  name: {{ .Values.account.name }}
+  name: {{ .Values.nack.account.name }}
   labels:
     {{- include "jmap2nats.labels" . | nindent 4 }}
 spec:
-  name: {{ .Values.account.name | quote }}
+  name: {{ .Values.nack.account.name | quote }}
   servers:
-    {{- with .Values.account.servers }}
+    {{- with .Values.nack.account.servers }}
     {{- toYaml . | nindent 4 }}
     {{- else }}
     - {{ .Values.config.nats.url | quote }}
     {{- end }}
-  user:
-    secret:
-      name: {{ .Values.account.secretName | default .Values.auth.nats.secretName | default .Values.auth.jmap.secretName | quote }}
-    user: {{ .Values.account.userKey | quote }}
-    password: {{ .Values.account.passwordKey | default .Values.auth.nats.passwordKey | quote }}
+  {{- include "jmap2nats.accountUser" . | nindent 2 }}
 {{- end }}

@@ -55,36 +55,38 @@ spec:
             defaultMode: 288
             sources:
               - secret:
-                  name: {{ .Values.auth.jmap.secretName | quote }}
+                  name: {{ .Values.secrets.jmap.secret.name | quote }}
                   items:
-                    - key: {{ .Values.auth.jmap.secretKey }}
+                    - key: {{ .Values.secrets.jmap.token }}
                       path: token
-              {{- if .Values.auth.nats.tokenKey }}
+              {{- $method := include "jmap2nats.natsMethod" . | trim }}
+              {{- $name := include "jmap2nats.natsSecretName" . }}
+              {{- $nats := .Values.secrets.nats }}
+              {{- if eq $method "token" }}
               - secret:
-                  name: {{ .Values.auth.nats.secretName | default .Values.auth.jmap.secretName | quote }}
+                  name: {{ $name | quote }}
                   items:
-                    - key: {{ .Values.auth.nats.tokenKey }}
+                    - key: {{ $nats.token.token }}
                       path: nats.token
-              {{- end }}
-              {{- if .Values.auth.nats.passwordKey }}
+              {{- else if eq $method "user" }}
               - secret:
-                  name: {{ .Values.auth.nats.secretName | default .Values.auth.jmap.secretName | quote }}
+                  name: {{ $name | quote }}
                   items:
-                    - key: {{ .Values.auth.nats.passwordKey }}
+                    - key: {{ $nats.user.user }}
+                      path: nats.user
+                    - key: {{ $nats.user.password }}
                       path: nats.password
-              {{- end }}
-              {{- if .Values.auth.nats.credsKey }}
+              {{- else if eq $method "creds" }}
               - secret:
-                  name: {{ .Values.auth.nats.secretName | default .Values.auth.jmap.secretName | quote }}
+                  name: {{ $name | quote }}
                   items:
-                    - key: {{ .Values.auth.nats.credsKey }}
+                    - key: {{ $nats.creds.file }}
                       path: nats.creds
-              {{- end }}
-              {{- if .Values.auth.nats.secretKey }}
+              {{- else if eq $method "nkey" }}
               - secret:
-                  name: {{ .Values.auth.nats.secretName | default .Values.auth.jmap.secretName | quote }}
+                  name: {{ $name | quote }}
                   items:
-                    - key: {{ .Values.auth.nats.secretKey }}
+                    - key: {{ $nats.nkey.seed }}
                       path: nats.nk
               {{- end }}
       {{- with .Values.nodeSelector }}

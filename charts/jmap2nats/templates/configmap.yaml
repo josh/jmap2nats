@@ -1,3 +1,4 @@
+{{- include "jmap2nats.validate" . -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

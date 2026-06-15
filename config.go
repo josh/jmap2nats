@@ -27,6 +27,7 @@ type NATSConfig struct {
 	URL          string `json:"url"`
 	TokenFile    string `json:"token_file"`
 	User         string `json:"user"`
+	UserFile     string `json:"user_file"`
 	PasswordFile string `json:"password_file"`
 	CredsFile    string `json:"creds_file"`
 	NkeySeedFile string `json:"nkey_seed_file"`
@@ -93,11 +94,15 @@ func (c Config) validate() error {
 	if c.NATS.URL == "" {
 		return fmt.Errorf("nats.url is required")
 	}
-	if (c.NATS.User == "") != (c.NATS.PasswordFile == "") {
-		return fmt.Errorf("nats.user and nats.password_file must be set together")
+	if c.NATS.User != "" && c.NATS.UserFile != "" {
+		return fmt.Errorf("nats: set at most one of user or user_file")
+	}
+	userSet := c.NATS.User != "" || c.NATS.UserFile != ""
+	if userSet != (c.NATS.PasswordFile != "") {
+		return fmt.Errorf("nats.user/user_file and nats.password_file must be set together")
 	}
 	methods := 0
-	for _, on := range []bool{c.NATS.TokenFile != "", c.NATS.User != "", c.NATS.CredsFile != "", c.NATS.NkeySeedFile != ""} {
+	for _, on := range []bool{c.NATS.TokenFile != "", userSet, c.NATS.CredsFile != "", c.NATS.NkeySeedFile != ""} {
 		if on {
 			methods++
 		}

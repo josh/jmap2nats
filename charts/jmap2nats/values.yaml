@@ -7,15 +7,16 @@ imagePullSecrets: []
 
 replicaCount: 1
 
-# Maps 1:1 to jmap2nats's config.json schema. The chart injects jmap.token_file
-# at template time; you don't need to set it.
+# Application config. Maps 1:1 to jmap2nats's config.json schema. The chart
+# injects the auth file paths (jmap.token_file, nats.*_file) and the NATS
+# username at template time from the `secrets` block below — you don't set them
+# here.
 config:
   jmap:
     session_url: "https://api.fastmail.com/jmap/session"
     account_id: ""
   nats:
     url: "nats://nats:4222"
-    user: ""
   stream:
     name: "JMAP_EMAILS"
     subject_prefix: "jmap.email"
@@ -27,37 +28,6 @@ config:
     max_bytes: "960MiB"
     max_per_part: "25MiB"
   backfill_limit: 100
-
-auth:
-  # JMAP bearer token. You must create this Secret yourself (e.g. via
-  # sealed-secrets, External Secrets, sops, or `kubectl create secret generic`).
-  # The pod will not start until it exists. The token is mounted at
-  # /etc/jmap2nats/secrets/token and jmap.token_file is injected into the
-  # rendered config.json.
-  jmap:
-    secretName: ""
-    secretKey: token
-  # Optional NATS authentication (choose at most one of token, user/password,
-  # creds, or NKEY). nats.secretName defaults to jmap.secretName when empty, so
-  # the material can live in the same Secret as the JMAP token or a dedicated
-  # NATS Secret.
-  #
-  # Token: set nats.tokenKey. The token is mounted at /etc/jmap2nats/secrets/nats.token
-  #   and nats.token_file is injected into the rendered config.json.
-  # User/password: set nats.passwordKey (and config.nats.user). The password is
-  #   mounted at /etc/jmap2nats/secrets/nats.password and nats.password_file is
-  #   injected into the rendered config.json.
-  # Creds: set nats.credsKey. The creds file is mounted at
-  #   /etc/jmap2nats/secrets/nats.creds and nats.creds_file is injected into the
-  #   rendered config.json.
-  # NKEY: set nats.secretKey. The seed is mounted at /etc/jmap2nats/secrets/nats.nk
-  #   and nats.nkey_seed_file is injected into the rendered config.json.
-  nats:
-    secretName: ""
-    secretKey: ""
-    passwordKey: ""
-    tokenKey: ""
-    credsKey: ""
 
 nack:
   # Render a NACK Stream CRD (jetstream.nats.io/v1beta2). Requires the NACK
@@ -72,19 +42,87 @@ nack:
     compression: s2
     maxMsgSize: 1048576
     maxMsgsPerSubject: -1
+  # Optionally render a NACK Account CRD so the managed Stream targets a
+  # non-default NATS account via spec.account. The Account CRD is
+  # connection-config only; it does NOT create the account server-side. Rendered
+  # only when nack.enabled is true and account.name is set; credentials come
+  # from secrets.nack (which defaults to reusing secrets.nats).
+  account:
+    name: ""        # Account CRD metadata.name + spec.name; "" disables rendering.
+    servers: []     # defaults to [ config.nats.url ]
 
-# Optionally render a NACK Account CRD (jetstream.nats.io/v1beta2 kind: Account) so the
-# managed Stream (and externally-managed consumers in the same namespace) can target a
-# non-default NATS account via spec.account. The Account CRD is connection-config only; it
-# does NOT create the NATS account server-side. When account.name is set, the Account CRD is
-# rendered and the Stream's spec.account is set to it. Credentials reuse the NATS auth Secret
-# (user/password).
-account:
-  name: ""          # Account CRD metadata.name + spec.name; "" disables rendering.
-  servers: []       # defaults to [ config.nats.url ]
-  secretName: ""    # Secret with the user+password; defaults to auth.nats.secretName | auth.jmap.secretName
-  userKey: ""       # Secret key holding the NATS username
-  passwordKey: ""   # Secret key holding the password; defaults to auth.nats.passwordKey
+# Every Kubernetes Secret this chart consumes. The auth blocks are modeled on
+# the NACK Account CRD connection schema (jetstream.nats.io): each method nests
+# `secret: {name}` plus the key(s) within that Secret. You must create the
+# Secrets yourself (sealed-secrets, External Secrets, sops, kubectl, ...); the
+# chart only references them.
+#
+# Pick the right shape for your setup:
+#   1. anonymous NATS, no NACK ........ set secrets.jmap only.
+#   2. NACK + default account ......... set secrets.jmap + one secrets.nats method;
+#                                       nack.enabled=true; leave nack.account.name "".
+#   3. NACK custom account, reuse ..... as (2) with secrets.nats.user; set
+#                                       nack.account.name; leave secrets.nack empty
+#                                       (the account reuses secrets.nats verbatim).
+#   4. NACK custom account, separate .. as (3) but populate a secrets.nack method
+#                                       (e.g. token) to give the account its own creds.
+secrets:
+  # JMAP bearer token (required). Mounted at /etc/jmap2nats/secrets/token;
+  # config.jmap.token_file is injected into the rendered config.json.
+  jmap:
+    secret:
+      name: ""
+    token: token            # key in the Secret holding the bearer token
+
+  # App NATS auth. The connection is anonymous unless exactly ONE method block
+  # below is populated. Each method's secret.name defaults to
+  # secrets.jmap.secret.name when left empty, so the material can live alongside
+  # the JMAP token or in a dedicated Secret. The chart mounts the key(s) to
+  # files and injects the matching nats.*_file path(s) into config.json.
+  nats:
+    token:                  # -> nats.token_file
+      secret:
+        name: ""
+      token: ""             # key holding the token
+    user:                   # -> nats.user_file + nats.password_file
+      secret:
+        name: ""
+      user: ""              # key holding the username
+      password: ""          # key holding the password
+    creds:                  # -> nats.creds_file
+      secret:
+        name: ""
+      file: ""              # key holding the nsc creds file
+    nkey:                   # -> nats.nkey_seed_file
+      secret:
+        name: ""
+      seed: ""              # key holding the nkey seed
+
+  # Auth for the NACK Account CRD (only used when nack.account.name is set).
+  # Leave entirely empty to REUSE secrets.nats (same method, Secret, and keys).
+  # Populate exactly ONE method block to point the account at different
+  # credentials. Each method's secret.name defaults to the matching secrets.nats
+  # secret -> secrets.jmap.secret.name. NACK reads these keys from the Secret
+  # directly, so a user/password account needs the username as a key here too
+  # (which is why the chart always stores the NATS username in its Secret).
+  nack:
+    token:
+      secret:
+        name: ""
+      token: ""
+    user:
+      secret:
+        name: ""
+      user: ""
+      password: ""
+    creds:
+      secret:
+        name: ""
+      file: ""
+    nkey:
+      secret:
+        name: ""
+      seed: ""
 
 serviceAccount:
   create: true

@@ -32,12 +32,20 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 			return nil, fmt.Errorf("nats token_file: %w", err)
 		}
 		opts = append(opts, nats.Token(token))
-	case cfg.NATS.User != "":
+	case cfg.NATS.User != "" || cfg.NATS.UserFile != "":
+		user := cfg.NATS.User
+		if cfg.NATS.UserFile != "" {
+			u, err := readSecretFile(cfg.NATS.UserFile)
+			if err != nil {
+				return nil, fmt.Errorf("nats user_file: %w", err)
+			}
+			user = u
+		}
 		password, err := readSecretFile(cfg.NATS.PasswordFile)
 		if err != nil {
 			return nil, fmt.Errorf("nats password_file: %w", err)
 		}
-		opts = append(opts, nats.UserInfo(cfg.NATS.User, password))
+		opts = append(opts, nats.UserInfo(user, password))
 	case cfg.NATS.CredsFile != "":
 		opts = append(opts, nats.UserCredentials(cfg.NATS.CredsFile))
 	case cfg.NATS.NkeySeedFile != "":
