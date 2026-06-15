@@ -55,7 +55,7 @@ spec:
             defaultMode: 288
             sources:
               - secret:
-                  name: {{ .Values.secrets.jmap.secret.name | quote }}
+                  name: {{ include "jmap2nats.jmapSecretName" . | quote }}
                   items:
                     - key: {{ .Values.secrets.jmap.token }}
                       path: token

@@ -71,7 +71,9 @@ secrets:
   # config.jmap.token_file is injected into the rendered config.json.
   jmap:
     secret:
-      name: ""
+      name: ""              # defaults to <fullname>-secrets; the nats/nack
+                            # methods below default to this same Secret, so one
+                            # Secret with per-credential keys is the common case.
     token: token            # key in the Secret holding the bearer token
 
   # App NATS auth. The connection is anonymous unless exactly ONE method block

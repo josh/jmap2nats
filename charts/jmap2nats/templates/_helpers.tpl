@@ -69,6 +69,15 @@ Explicit image.tag overrides pass through.
 {{- end -}}
 
 {{/*
+The Secret name backing the JMAP token, also the default Secret for the NATS
+auth methods. Falls back to the chart fullname when secrets.jmap.secret.name is
+left empty, so the chart renders without overrides.
+*/}}
+{{- define "jmap2nats.jmapSecretName" -}}
+{{- .Values.secrets.jmap.secret.name | default (printf "%s-secrets" (include "jmap2nats.fullname" .)) -}}
+{{- end -}}
+
+{{/*
 The app's NATS auth method: token | user | creds | nkey | none. Determined by
 which secrets.nats method block is populated (the connection is anonymous when
 none is).
@@ -117,7 +126,7 @@ secret.name, defaulting to the JMAP token Secret).
 {{- $method := include "jmap2nats.natsMethod" . | trim -}}
 {{- if ne $method "none" -}}
 {{- $b := index .Values.secrets.nats $method -}}
-{{- $b.secret.name | default .Values.secrets.jmap.secret.name -}}
+{{- $b.secret.name | default (include "jmap2nats.jmapSecretName" .) -}}
 {{- end -}}
 {{- end -}}
 
@@ -142,7 +151,7 @@ Emits nothing for an anonymous (none) method. Maps value field names to the
 CRD's field names (creds.file, nkey.seed, ...).
 */}}
 {{- define "jmap2nats.accountUser" -}}
-{{- $jmapName := .Values.secrets.jmap.secret.name -}}
+{{- $jmapName := include "jmap2nats.jmapSecretName" . -}}
 {{- $method := include "jmap2nats.accountMethod" . | trim -}}
 {{- $nackCount := include "jmap2nats.nackMethodCount" . | int -}}
 {{- if ne $method "none" -}}
@@ -185,9 +194,6 @@ Fail-fast validation of the secrets / nack configuration. Included from
 configmap.yaml so any render path triggers it.
 */}}
 {{- define "jmap2nats.validate" -}}
-{{- if not .Values.secrets.jmap.secret.name -}}
-{{- fail "secrets.jmap.secret.name is required (the Secret holding the JMAP bearer token)" -}}
-{{- end -}}
 {{- if not .Values.secrets.jmap.token -}}
 {{- fail "secrets.jmap.token is required (the key in the Secret holding the bearer token)" -}}
 {{- end -}}
