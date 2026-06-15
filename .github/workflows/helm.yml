@@ -19,8 +19,38 @@ jobs:
 
       - name: Lint chart
         run: |
-          helm lint ./charts/jmap2nats
+          helm lint ./charts/jmap2nats \
+            --set secrets.jmap.secret.name=jmap2nats
 
       - name: Template chart
         run: |
-          helm template test ./charts/jmap2nats
+          helm template test ./charts/jmap2nats \
+            --set secrets.jmap.secret.name=jmap2nats
+
+      - name: Template chart with NACK
+        run: |
+          helm template test ./charts/jmap2nats \
+            --set secrets.jmap.secret.name=jmap2nats \
+            --set nack.enabled=true
+
+      - name: Template chart with NACK account reusing auth
+        run: |
+          helm template test ./charts/jmap2nats \
+            --set secrets.jmap.secret.name=jmap2nats \
+            --set secrets.nats.user.secret.name=nats \
+            --set secrets.nats.user.user=user \
+            --set secrets.nats.user.password=password \
+            --set nack.enabled=true \
+            --set nack.account.name=jmap2nats
+
+      - name: Template chart with NACK auth and account
+        run: |
+          helm template test ./charts/jmap2nats \
+            --set secrets.jmap.secret.name=jmap2nats \
+            --set secrets.nats.user.secret.name=nats \
+            --set secrets.nats.user.user=user \
+            --set secrets.nats.user.password=password \
+            --set nack.enabled=true \
+            --set nack.account.name=jmap2nats \
+            --set secrets.nack.token.secret.name=nack \
+            --set secrets.nack.token.token=token
