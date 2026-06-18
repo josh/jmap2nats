@@ -152,20 +152,32 @@ Each email becomes one NATS message:
   - `Jmap-Message-Id`, `Jmap-In-Reply-To`, `Jmap-References`
   - `Jmap-Mailbox-Ids`, `Jmap-Keywords`
   - `Jmap-Has-Attachment`, `Jmap-Size`
-- **Body**: the JMAP `Email` object as JSON — same field names as
+- **Body**: the JMAP `Email` object as JSON -- same field names as
   [RFC 8621 §4][rfc8621-4] (`id`, `blobId`, `threadId`, `mailboxIds`,
   `keywords`, `from`, `to`, `subject`, `receivedAt`, `bodyStructure`,
-  `textBody`, `htmlBody`, `attachments`, …). The `bodyValues` map is
-  omitted — those bytes are in the object store. Each part with a
+  `textBody`, `htmlBody`, `attachments`, ...). The `bodyValues` map is
+  omitted -- those bytes are in the object store. Each part with a
   `blobId` carries an extra `objectKey` field pointing into the bucket.
 
-Every JMAP `EmailBodyPart` with a `blobId` — text bodies, html bodies,
-inline images, attachments — is stored as one object in the
+Every JMAP `EmailBodyPart` with a `blobId` -- text bodies, html bodies,
+inline images, attachments -- is stored as one object in the
 `email-parts` bucket, keyed `<accountId>/<emailId>/<blobId>`. This lets
-multiple JMAP accounts safely share one stream and object-store bucket. Parts over
-`parts.max_per_part` are skipped and flagged with `"skipped": true,
-"objectKey": null` in the JSON; consumers can still fetch them
-directly from the JMAP server via the `blobId`.
+multiple JMAP accounts safely share one stream and object-store bucket.
+
+Consumers must use each part's `type` to interpret the object contents:
+
+- `text/*` entries in `textBody` and `htmlBody` contain JMAP-decoded
+  UTF-8 text from `Email/get bodyValues`, with line endings normalized
+  to LF.
+- Non-text body parts and attachments contain raw bytes from
+  `Blob/download`.
+
+If a required text body value is missing, truncated, or reports a JMAP
+encoding problem, the part is flagged with `"error": "..."` and no
+`objectKey`; jmap2nats does not fall back to raw blob bytes for those
+text bodies. Parts over `parts.max_per_part` are skipped and flagged
+with `"skipped": true` and no `objectKey`; consumers can still fetch
+them directly from the JMAP server via the `blobId`.
 
 [rfc8621-4]: https://datatracker.ietf.org/doc/html/rfc8621#section-4
 

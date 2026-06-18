@@ -9,8 +9,6 @@ import (
 	"git.sr.ht/~rockorager/go-jmap/mail/email"
 )
 
-const maxBodyValueBytes = 10 * 1024 * 1024
-
 type JMAPClient struct {
 	cfg       Config
 	log       *slog.Logger
@@ -132,7 +130,6 @@ func (j *JMAPClient) FetchEmail(id jmap.ID) (*email.Email, error) {
 		IDs:                 []jmap.ID{id},
 		FetchTextBodyValues: true,
 		FetchHTMLBodyValues: true,
-		MaxBodyValueBytes:   maxBodyValueBytes,
 	})
 	resp, err := j.client.Do(req)
 	if err != nil {

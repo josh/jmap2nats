@@ -425,6 +425,7 @@ func (b *Bridge) processOne(ctx context.Context, id jmap.ID) error {
 
 func (b *Bridge) storeParts(ctx context.Context, env *envelope) {
 	maxBytes := uint64(b.cfg.Parts.MaxPerPart.Int64())
+	textBodies := textBodyPartIDs(env.Email)
 	visit := func(p *email.BodyPart) {
 		if p == nil || p.BlobID == "" {
 			return
@@ -443,8 +444,13 @@ func (b *Bridge) storeParts(ctx context.Context, env *envelope) {
 		}
 		var src io.Reader
 		var closer io.Closer
-		if bv, ok := env.Email.BodyValues[p.PartID]; ok && p.PartID != "" {
-			src = strings.NewReader(bv.Value)
+		if textBodies[p.PartID] {
+			text, err := textBodyValue(env.Email.BodyValues, p.PartID)
+			if err != nil {
+				res.Error = err.Error()
+				return
+			}
+			src = strings.NewReader(text)
 		} else {
 			rc, err := b.jc.Client().DownloadWithContext(ctx, env.AccountID, p.BlobID)
 			if err != nil {
@@ -477,6 +483,47 @@ func (b *Bridge) storeParts(ctx context.Context, env *envelope) {
 	for _, p := range env.Email.Attachments {
 		visit(p)
 	}
+}
+
+func textBodyPartIDs(em *email.Email) map[string]bool {
+	ids := map[string]bool{}
+	add := func(parts []*email.BodyPart) {
+		for _, p := range parts {
+			if p == nil || p.PartID == "" || !isTextPart(p) {
+				continue
+			}
+			ids[p.PartID] = true
+		}
+	}
+	add(em.TextBody)
+	add(em.HTMLBody)
+	return ids
+}
+
+func textBodyValue(values map[string]*email.BodyValue, partID string) (string, error) {
+	if partID == "" {
+		return "", fmt.Errorf("body value missing: empty partId")
+	}
+	bv, ok := values[partID]
+	if !ok || bv == nil {
+		return "", fmt.Errorf("body value missing: partId %s", partID)
+	}
+	if bv.IsTruncated {
+		return "", fmt.Errorf("body value truncated: partId %s", partID)
+	}
+	if bv.IsEncodingProblem {
+		return "", fmt.Errorf("body value encoding problem: partId %s", partID)
+	}
+	return normalizeLineEndings(bv.Value), nil
+}
+
+func isTextPart(p *email.BodyPart) bool {
+	return strings.HasPrefix(strings.ToLower(p.Type), "text/")
+}
+
+func normalizeLineEndings(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	return strings.ReplaceAll(s, "\r", "\n")
 }
 
 func walkBodyParts(p *email.BodyPart, f func(*email.BodyPart)) {
