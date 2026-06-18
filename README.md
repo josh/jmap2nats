@@ -79,11 +79,11 @@ Example `jmap2nats.json`:
 | `jmap.account_id`           | primary mail account    | Override if not the session primary.                                                                                                        |
 | `nats.url`                  | `nats://localhost:4222` |                                                                                                                                             |
 | `nats.token_file`           | unset                   | Path to a file containing a NATS auth token. Trailing whitespace is trimmed.                                                                |
-| `nats.user`                 | unset                   | NATS username (literal); set together with `nats.password_file`. Mutually exclusive with `nats.user_file`.                                   |
-| `nats.user_file`            | unset                   | Path to a file containing the NATS username; alternative to the literal `nats.user`. Trailing whitespace is trimmed.                         |
+| `nats.user`                 | unset                   | NATS username (literal); set together with `nats.password_file`. Mutually exclusive with `nats.user_file`.                                  |
+| `nats.user_file`            | unset                   | Path to a file containing the NATS username; alternative to the literal `nats.user`. Trailing whitespace is trimmed.                        |
 | `nats.password_file`        | unset                   | Path to a file containing the NATS password (plaintext, even when the server stores a bcrypt hash). Trailing whitespace is trimmed.         |
-| `nats.creds_file`           | unset                   | Path to a NATS creds file (decentralized JWT / NGS); the `nsc`-generated bundle of the user JWT + signing nkey seed.                         |
-| `nats.nkey_seed_file`       | unset                   | Path to a NATS nkey seed file. The seed signs the server's challenge.                                                                        |
+| `nats.creds_file`           | unset                   | Path to a NATS creds file (decentralized JWT / NGS); the `nsc`-generated bundle of the user JWT + signing nkey seed.                        |
+| `nats.nkey_seed_file`       | unset                   | Path to a NATS nkey seed file. The seed signs the server's challenge.                                                                       |
 | `stream.name`               | `JMAP_EMAILS`           |                                                                                                                                             |
 | `stream.subject_prefix`     | `jmap.email`            | Subject = `<prefix>.<accountId>`.                                                                                                           |
 | `stream.max_age`            | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.                                                                                              |
@@ -102,7 +102,7 @@ referenced by file path — nothing is read from an environment variable or CLI
 flag.
 
 - **Token**: `nats.token_file`.
-- **Username/password** (plaintext *and* bcrypted): `nats.user` (or
+- **Username/password** (plaintext _and_ bcrypted): `nats.user` (or
   `nats.user_file` to read the username from a file) + `nats.password_file`.
   Bcrypt is a server-side storage concern — the client always sends the
   plaintext password, so the same config covers both.
