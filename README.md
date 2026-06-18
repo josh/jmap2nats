@@ -151,7 +151,11 @@ Each email becomes one NATS message:
   the `Nats-Msg-Id` and `Jmap-Email-Id` headers and in the JSON body's
   `id` field, not in the subject.
 - **`Nats-Msg-Id` header**: `<accountId>/<emailId>`, used for dedup.
+- **Schema version**: `Jmap2nats-Schema-Version: 1`. Schema version `1`
+  covers the subject format, public message headers, JSON body shape, and
+  object-store key format.
 - **Other headers** (filterable without parsing the body):
+  - `Jmap2nats-Schema-Version`
   - `Jmap-Account-Id`, `Jmap-Email-Id`, `Jmap-Thread-Id`
   - `Jmap-From`, `Jmap-To`, `Jmap-Cc`
   - `Jmap-Subject`
@@ -164,7 +168,10 @@ Each email becomes one NATS message:
   `keywords`, `from`, `to`, `subject`, `receivedAt`, `bodyStructure`,
   `textBody`, `htmlBody`, `attachments`, ...). The `bodyValues` map is
   omitted -- those bytes are in the object store. Each part with a
-  `blobId` carries an extra `objectKey` field pointing into the bucket.
+  `blobId` reports one of the following outcomes:
+  - Stored parts include an `objectKey` field pointing into the bucket.
+  - Skipped parts include `"skipped": true` and omit `objectKey`.
+  - Errored parts include `"error": "..."` and omit `objectKey`.
 
 Every JMAP `EmailBodyPart` with a `blobId` -- text bodies, html bodies,
 inline images, attachments -- is stored as one object in the

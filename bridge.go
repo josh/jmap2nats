@@ -18,6 +18,11 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
+const (
+	natsHeaderSchemaVersion = "Jmap2nats-Schema-Version"
+	wireSchemaVersion       = "1"
+)
+
 type envelope struct {
 	AccountID jmap.ID
 	Email     *email.Email
@@ -153,6 +158,7 @@ func (e *envelope) partViewOf(p *email.BodyPart) *partView {
 func (e *envelope) NATSHeaders() nats.Header {
 	h := nats.Header{}
 	em := e.Email
+	h.Set(natsHeaderSchemaVersion, wireSchemaVersion)
 	h.Set("Jmap-Account-Id", string(e.AccountID))
 	h.Set("Jmap-Email-Id", string(em.ID))
 	if em.ThreadID != "" {
