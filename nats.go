@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ type NATSResources struct {
 	js     jetstream.JetStream
 	stream jetstream.Stream
 	parts  jetstream.ObjectStore
+	cursor jetstream.KeyValue
 }
 
 func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResources, error) {
@@ -113,12 +115,24 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 		"max_bytes", cfg.Parts.MaxBytes,
 	)
 
+	cursor, err := js.CreateOrUpdateKeyValue(ctx, jetstream.KeyValueConfig{
+		Bucket:  cfg.Cursor.Bucket,
+		History: 1,
+		Storage: jetstream.FileStorage,
+	})
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("ensure cursor key-value bucket %s: %w", cfg.Cursor.Bucket, err)
+	}
+	log.Info("cursor store ready", "bucket", cfg.Cursor.Bucket)
+
 	return &NATSResources{
 		cfg:    cfg,
 		conn:   conn,
 		js:     js,
 		stream: stream,
 		parts:  parts,
+		cursor: cursor,
 	}, nil
 }
 
@@ -163,8 +177,35 @@ func (n *NATSResources) Publish(ctx context.Context, env *envelope, body []byte)
 	return ack.Duplicate, nil
 }
 
+func (n *NATSResources) LoadCursor(ctx context.Context, accountID string) (string, error) {
+	key := cursorKey(accountID)
+	entry, err := n.cursor.Get(ctx, key)
+	if err != nil {
+		if errors.Is(err, jetstream.ErrKeyNotFound) {
+			return "", nil
+		}
+		return "", fmt.Errorf("load cursor %s: %w", key, err)
+	}
+	return string(entry.Value()), nil
+}
+
+func (n *NATSResources) SaveCursor(ctx context.Context, accountID, state string) error {
+	if state == "" {
+		return fmt.Errorf("cursor state is empty")
+	}
+	key := cursorKey(accountID)
+	if _, err := n.cursor.Put(ctx, key, []byte(state)); err != nil {
+		return fmt.Errorf("save cursor %s: %w", key, err)
+	}
+	return nil
+}
+
 func messageDedupID(accountID, emailID string) string {
 	return accountID + "/" + emailID
+}
+
+func cursorKey(accountID string) string {
+	return "account." + base64.RawURLEncoding.EncodeToString([]byte(accountID))
 }
 
 func partObjectKey(accountID, emailID, blobID string) string {

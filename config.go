@@ -14,6 +14,7 @@ type Config struct {
 	NATS          NATSConfig   `json:"nats"`
 	Stream        StreamConfig `json:"stream"`
 	Parts         PartsConfig  `json:"parts"`
+	Cursor        CursorConfig `json:"cursor"`
 	BackfillLimit uint64       `json:"backfill_limit"`
 }
 
@@ -48,6 +49,10 @@ type PartsConfig struct {
 	MaxPerPart Bytes  `json:"max_per_part"`
 }
 
+type CursorConfig struct {
+	Bucket string `json:"bucket"`
+}
+
 func defaultConfig() Config {
 	return Config{
 		NATS: NATSConfig{
@@ -77,6 +82,9 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
+	}
+	if cfg.Cursor.Bucket == "" {
+		cfg.Cursor.Bucket = cfg.Stream.Name + "_CURSOR"
 	}
 	if err := cfg.validate(); err != nil {
 		return cfg, fmt.Errorf("invalid config %s: %w", path, err)
@@ -118,6 +126,9 @@ func (c Config) validate() error {
 	}
 	if c.Parts.Bucket == "" {
 		return fmt.Errorf("parts.bucket is required")
+	}
+	if c.Cursor.Bucket == "" {
+		return fmt.Errorf("cursor.bucket is required")
 	}
 	if c.Parts.MaxBytes <= 0 || c.Parts.MaxPerPart <= 0 {
 		return fmt.Errorf("parts.max_bytes and parts.max_per_part must be positive")

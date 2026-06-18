@@ -27,6 +27,8 @@ config:
     bucket: "email-parts"
     max_bytes: "960MiB"
     max_per_part: "25MiB"
+  cursor:
+    bucket: "JMAP_EMAILS_CURSOR"
   backfill_limit: 100
 
 nack:

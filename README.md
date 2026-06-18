@@ -7,10 +7,10 @@ and republishes newly-arrived emails onto a NATS JetStream stream.
 - **HA-safe**: run multiple replicas — every publish carries a `Nats-Msg-Id`
   set to `<accountId>/<emailId>`, so concurrent publishes from different
   replicas are deduplicated server-side within the stream's `DuplicateWindow`.
-- **Outage-tolerant**: on boot the service finds the most-recent email
-  already in the stream and re-checks any newer JMAP ids up to
-  `backfill_limit`. Messages are missed only if more than `backfill_limit`
-  arrived during downtime (default 100).
+- **Outage-tolerant**: the service persists the last successfully processed
+  JMAP `Email` state in a NATS KV bucket and resumes from that cursor after
+  restarts. If the server can no longer calculate changes from the saved state,
+  jmap2nats falls back to a bounded recent backfill.
 - **JMAP-faithful** payload: the NATS message body is the JMAP `Email`
   object as JSON (RFC 8621 field names), with body/attachment bytes
   externalised to an Object Store and referenced by key.
@@ -68,6 +68,9 @@ Example `jmap2nats.json`:
     "max_bytes": "960MiB",
     "max_per_part": "25MiB"
   },
+  "cursor": {
+    "bucket": "JMAP_EMAILS_CURSOR"
+  },
   "backfill_limit": 100
 }
 ```
@@ -93,7 +96,8 @@ Example `jmap2nats.json`:
 | `parts.bucket`              | `email-parts`           | Object Store bucket for all body/attachment parts.                                                                                          |
 | `parts.max_bytes`           | `960MiB`                | Bucket cap.                                                                                                                                 |
 | `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                                                     |
-| `backfill_limit`            | `100`                   | N most-recent emails to re-check on boot.                                                                                                   |
+| `cursor.bucket`             | `<stream.name>_CURSOR`  | JetStream KV bucket for durable per-account JMAP state cursors.                                                                             |
+| `backfill_limit`            | `100`                   | N most-recent emails to re-check on first run or expired-state fallback.                                                                    |
 
 NATS authentication is optional; configure at most one of `nats.token_file`,
 `nats.user`/`nats.user_file` + `nats.password_file`, `nats.creds_file`, or
@@ -124,16 +128,19 @@ and exits.
 The service:
 
 1. Authenticates with the JMAP server.
-2. Creates or updates the JetStream stream and object-store bucket.
-3. Re-checks the last N most-recent emails (boot recovery).
+2. Creates or updates the JetStream stream, object-store bucket, and cursor
+   KV bucket.
+3. Loads the persisted JMAP cursor for the account. If none exists, it
+   bootstraps once with the bounded recent backfill and then saves the current
+   JMAP state.
 4. Opens a JMAP `EventSource` SSE connection and republishes every newly
    created email as it arrives.
 
 For HA, run several copies pointed at the same NATS cluster. Concurrent
 publishes (same JMAP account id and email id from different replicas) are
-rejected by the stream's `Nats-Msg-Id` dedup window; on boot, each replica
-reads the most-recent published email per account and skips anything already
-in the stream, so backfill work isn't repeated across restarts.
+rejected by the stream's `Nats-Msg-Id` dedup window; replicas share the same
+per-account cursor in NATS KV, so normal restarts resume from the last saved
+JMAP state rather than from message ordering in the stream.
 
 ## Data model
 
@@ -210,9 +217,10 @@ nats object info email-parts
 - Only `created` events are published. JMAP `Email/changes` `updated`
   and `destroyed` ids are ignored — this is a mail forwarder, not a
   general state replicator.
-- The boot-time backfill is bounded by `backfill_limit`. If a replica is
-  offline for long enough that more than `backfill_limit` emails arrive
-  before it returns, the oldest of those are not re-checked.
+- Outage recovery is durable while the JMAP server can calculate changes from
+  the saved cursor. First-run bootstrap and expired-state fallback are bounded
+  by `backfill_limit` and ordered by `receivedAt`; if more than that many
+  emails need fallback recovery, older creations are not re-checked.
 - One JMAP account per process. To bridge several accounts, run several
   instances with distinct configs. Account-qualified dedup ids and object
   keys allow those instances to share one stream and parts bucket safely.

@@ -232,9 +232,22 @@ func NewBridge(cfg Config, log *slog.Logger, jc *JMAPClient, nr *NATSResources) 
 }
 
 func (b *Bridge) Run(ctx context.Context) error {
-	cursor, err := b.bootRecover(ctx)
+	accountID := string(b.jc.AccountID())
+	cursor, err := b.nr.LoadCursor(ctx, accountID)
 	if err != nil {
-		return fmt.Errorf("boot recovery: %w", err)
+		return err
+	}
+	if cursor == "" {
+		b.log.Info("no persisted cursor found; running bounded bootstrap recovery", "account_id", accountID)
+		cursor, err = b.bootRecover(ctx)
+		if err != nil {
+			return fmt.Errorf("boot recovery: %w", err)
+		}
+		if err := b.nr.SaveCursor(ctx, accountID, cursor); err != nil {
+			return fmt.Errorf("save boot cursor: %w", err)
+		}
+	} else {
+		b.log.Info("loaded persisted cursor", "account_id", accountID, "state", cursor)
 	}
 	b.log.Info("entering push loop", "initial_state", cursor)
 
@@ -252,8 +265,9 @@ func (b *Bridge) Run(ctx context.Context) error {
 			next, err := b.syncChanges(ctx, current)
 			if err != nil {
 				if errors.Is(err, errCannotCalculate) {
-					b.log.Warn("server cannot calculate changes from cursor; doing full backfill")
-					next, err = b.bootRecover(ctx)
+					b.log.Warn("server cannot calculate changes from persisted cursor; running bounded fallback recovery",
+						"state", current, "backfill_limit", b.cfg.BackfillLimit)
+					next, err = b.recoverExpiredCursor(ctx)
 				}
 				if err != nil {
 					b.log.Error("sync failed", "err", err)
@@ -292,6 +306,17 @@ func (b *Bridge) Run(ctx context.Context) error {
 }
 
 var errCannotCalculate = errors.New("cannotCalculateChanges")
+
+func (b *Bridge) recoverExpiredCursor(ctx context.Context) (string, error) {
+	state, err := b.bootRecover(ctx)
+	if err != nil {
+		return "", err
+	}
+	if err := b.nr.SaveCursor(ctx, string(b.jc.AccountID()), state); err != nil {
+		return "", fmt.Errorf("save recovered cursor: %w", err)
+	}
+	return state, nil
+}
 
 func (b *Bridge) bootRecover(ctx context.Context) (string, error) {
 	highWater, err := b.nr.LastPublishedEmailID(ctx, string(b.jc.AccountID()))
@@ -337,6 +362,9 @@ func (b *Bridge) syncChanges(ctx context.Context, sinceState string) (string, er
 		return "", err
 	}
 	if len(created) == 0 {
+		if err := b.nr.SaveCursor(ctx, string(b.jc.AccountID()), newState); err != nil {
+			return sinceState, err
+		}
 		return newState, nil
 	}
 	b.log.Info("sync: new emails", "count", len(created), "since", sinceState, "now", newState)
@@ -347,6 +375,9 @@ func (b *Bridge) syncChanges(ctx context.Context, sinceState string) (string, er
 		if err := b.processOne(ctx, id); err != nil {
 			b.log.Error("process failed", "id", id, "err", err)
 		}
+	}
+	if err := b.nr.SaveCursor(ctx, string(b.jc.AccountID()), newState); err != nil {
+		return sinceState, err
 	}
 	return newState, nil
 }
