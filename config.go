@@ -83,13 +83,25 @@ func LoadConfig(path string) (Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
 	}
-	if cfg.Cursor.Bucket == "" {
-		cfg.Cursor.Bucket = cfg.Stream.Name + "_CURSOR"
-	}
+	applyDerivedDefaults(&cfg)
 	if err := cfg.validate(); err != nil {
 		return cfg, fmt.Errorf("invalid config %s: %w", path, err)
 	}
 	return cfg, nil
+}
+
+func TemplateConfig() Config {
+	cfg := defaultConfig()
+	cfg.JMAP.SessionURL = "https://api.fastmail.com/jmap/session"
+	cfg.JMAP.TokenFile = "/etc/jmap2nats/token"
+	applyDerivedDefaults(&cfg)
+	return cfg
+}
+
+func applyDerivedDefaults(cfg *Config) {
+	if cfg.Cursor.Bucket == "" {
+		cfg.Cursor.Bucket = cfg.Stream.Name + "_CURSOR"
+	}
 }
 
 func (c Config) validate() error {

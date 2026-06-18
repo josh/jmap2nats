@@ -41,9 +41,9 @@ A single JSON file. Path resolution, in order:
 2. `JMAP2NATS_CONFIG` env var.
 3. `./jmap2nats.json` in the working directory.
 
-`jmap2nats -print-config` dumps the merged (defaults + your overrides)
-config and exits — useful as a starting template. Pass `-verbose` to enable
-debug-level logging.
+`jmap2nats -print-config` dumps a default template config and exits without
+loading a config file. Use it as a starting point for `jmap2nats.json`. Pass
+`-verbose` to enable debug-level logging.
 
 Example `jmap2nats.json`:
 

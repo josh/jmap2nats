@@ -20,7 +20,7 @@ func main() {
 	}
 
 	configFlag := flag.String("config", "", "Path to JSON config file (overrides JMAP2NATS_CONFIG and ./jmap2nats.json)")
-	printConfig := flag.Bool("print-config", false, "Print the merged effective config and exit")
+	printConfig := flag.Bool("print-config", false, "Print the default template config and exit")
 	versionFlag := flag.Bool("version", false, "Print version and exit")
 	verbose := flag.Bool("verbose", false, "Enable debug-level logging")
 	flag.Parse()
@@ -30,17 +30,17 @@ func main() {
 		return
 	}
 
+	if *printConfig {
+		out, _ := json.MarshalIndent(TemplateConfig(), "", "  ")
+		fmt.Println(string(out))
+		return
+	}
+
 	path := resolveConfigPath(*configFlag)
 	cfg, err := LoadConfig(path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "jmap2nats:", err)
 		os.Exit(1)
-	}
-
-	if *printConfig {
-		out, _ := json.MarshalIndent(cfg, "", "  ")
-		fmt.Println(string(out))
-		return
 	}
 
 	level := slog.LevelInfo
