@@ -137,11 +137,11 @@ func (n *NATSResources) LastPublishedEmailID(ctx context.Context, accountID stri
 		}
 		return "", fmt.Errorf("get last msg for %s: %w", subject, err)
 	}
-	return msg.Header.Get(nats.MsgIdHdr), nil
+	return highWaterEmailID(msg.Header), nil
 }
 
-func (n *NATSResources) PutPart(ctx context.Context, emailID, blobID string, r io.Reader) (string, error) {
-	key := emailID + "/" + blobID
+func (n *NATSResources) PutPart(ctx context.Context, accountID, emailID, blobID string, r io.Reader) (string, error) {
+	key := partObjectKey(accountID, emailID, blobID)
 	_, err := n.parts.Put(ctx, jetstream.ObjectMeta{Name: key}, r)
 	if err != nil {
 		return "", fmt.Errorf("put object %s: %w", key, err)
@@ -156,9 +156,21 @@ func (n *NATSResources) Publish(ctx context.Context, env *envelope, body []byte)
 		Data:    body,
 		Header:  env.NATSHeaders(),
 	}
-	ack, err := n.js.PublishMsg(ctx, msg, jetstream.WithMsgID(string(env.Email.ID)))
+	ack, err := n.js.PublishMsg(ctx, msg, jetstream.WithMsgID(messageDedupID(string(env.AccountID), string(env.Email.ID))))
 	if err != nil {
 		return false, fmt.Errorf("publish %s: %w", subject, err)
 	}
 	return ack.Duplicate, nil
+}
+
+func messageDedupID(accountID, emailID string) string {
+	return accountID + "/" + emailID
+}
+
+func partObjectKey(accountID, emailID, blobID string) string {
+	return accountID + "/" + emailID + "/" + blobID
+}
+
+func highWaterEmailID(h nats.Header) string {
+	return h.Get("Jmap-Email-Id")
 }

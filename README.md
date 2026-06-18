@@ -5,8 +5,8 @@ and republishes newly-arrived emails onto a NATS JetStream stream.
 
 - **Real-time** via JMAP's `EventSource` (server-sent events). No polling.
 - **HA-safe**: run multiple replicas — every publish carries a `Nats-Msg-Id`
-  set to the JMAP email id, so concurrent publishes from different replicas
-  are deduplicated server-side within the stream's `DuplicateWindow`.
+  set to `<accountId>/<emailId>`, so concurrent publishes from different
+  replicas are deduplicated server-side within the stream's `DuplicateWindow`.
 - **Outage-tolerant**: on boot the service finds the most-recent email
   already in the stream and re-checks any newer JMAP ids up to
   `backfill_limit`. Messages are missed only if more than `backfill_limit`
@@ -130,10 +130,10 @@ The service:
    created email as it arrives.
 
 For HA, run several copies pointed at the same NATS cluster. Concurrent
-publishes (same JMAP email id from different replicas) are rejected by
-the stream's `Nats-Msg-Id` dedup window; on boot, each replica reads the
-most-recent published email per account and skips anything already in the
-stream, so backfill work isn't repeated across restarts.
+publishes (same JMAP account id and email id from different replicas) are
+rejected by the stream's `Nats-Msg-Id` dedup window; on boot, each replica
+reads the most-recent published email per account and skips anything already
+in the stream, so backfill work isn't repeated across restarts.
 
 ## Data model
 
@@ -143,7 +143,7 @@ Each email becomes one NATS message:
   All emails for an account share one subject; the emailId is carried in
   the `Nats-Msg-Id` and `Jmap-Email-Id` headers and in the JSON body's
   `id` field, not in the subject.
-- **`Nats-Msg-Id` header**: the JMAP email id, used for dedup.
+- **`Nats-Msg-Id` header**: `<accountId>/<emailId>`, used for dedup.
 - **Other headers** (filterable without parsing the body):
   - `Jmap-Account-Id`, `Jmap-Email-Id`, `Jmap-Thread-Id`
   - `Jmap-From`, `Jmap-To`, `Jmap-Cc`
@@ -161,7 +161,8 @@ Each email becomes one NATS message:
 
 Every JMAP `EmailBodyPart` with a `blobId` — text bodies, html bodies,
 inline images, attachments — is stored as one object in the
-`email-parts` bucket, keyed `<emailId>/<blobId>`. Parts over
+`email-parts` bucket, keyed `<accountId>/<emailId>/<blobId>`. This lets
+multiple JMAP accounts safely share one stream and object-store bucket. Parts over
 `parts.max_per_part` are skipped and flagged with `"skipped": true,
 "objectKey": null` in the JSON; consumers can still fetch them
 directly from the JMAP server via the `blobId`.
@@ -182,8 +183,8 @@ nats consumer add JMAP_EMAILS replay --filter 'jmap.email.>' \
   --deliver=all --replay=instant --ack=none --pull
 nats consumer next JMAP_EMAILS replay --count 5
 
-# Fetch any body part or attachment by its JMAP blobId
-nats object get email-parts <EMAIL_ID>/<BLOB_ID> --output ./part.bin
+# Fetch any body part or attachment by its objectKey
+nats object get email-parts <ACCOUNT_ID>/<EMAIL_ID>/<BLOB_ID> --output ./part.bin
 
 # List stored parts
 nats object ls email-parts
@@ -201,5 +202,5 @@ nats object info email-parts
   offline for long enough that more than `backfill_limit` emails arrive
   before it returns, the oldest of those are not re-checked.
 - One JMAP account per process. To bridge several accounts, run several
-  instances with distinct configs (and ideally distinct subject prefixes
-  if they share a stream).
+  instances with distinct configs. Account-qualified dedup ids and object
+  keys allow those instances to share one stream and parts bucket safely.

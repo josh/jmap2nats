@@ -454,7 +454,7 @@ func (b *Bridge) storeParts(ctx context.Context, env *envelope) {
 			src = rc
 			closer = rc
 		}
-		key, err := b.nr.PutPart(ctx, string(env.Email.ID), string(p.BlobID), src)
+		key, err := b.nr.PutPart(ctx, string(env.AccountID), string(env.Email.ID), string(p.BlobID), src)
 		if closer != nil {
 			_ = closer.Close()
 		}
