@@ -195,6 +195,33 @@ them directly from the JMAP server via the `blobId`.
 
 [rfc8621-4]: https://datatracker.ietf.org/doc/html/rfc8621#section-4
 
+## Stability
+
+`Jmap2nats-Schema-Version: 1` is a frozen wire contract. Within schema `1`
+these will not change incompatibly:
+
+- **Subject** `<prefix>.<accountId>`, **dedup id** (`Nats-Msg-Id`)
+  `<accountId>/<emailId>`, and **object-store key** `<accountId>/<emailId>/<blobId>`.
+  These embed JMAP ids with raw `.` and `/` separators, which is unambiguous
+  because RFC 8620 §1.2 restricts ids to `A-Za-z0-9_-`; jmap2nats rejects a
+  server that violates this rather than writing a malformed key.
+- The **public headers** and the **JSON body shape** (including the per-part
+  `objectKey` / `skipped` / `error` outcomes). `hasAttachment` is always
+  present in the body. `Jmap-Mailbox-Ids` and `Jmap-Keywords` are sorted, but
+  remain semantically unordered sets.
+- **Delivery is at-least-once.** Each email is published before its cursor is
+  checkpointed, so a crash mid-batch re-publishes; the stream's `Nats-Msg-Id`
+  dedup window (`stream.dedup_window`) absorbs the replay. Consumers should
+  treat the dedup id as the idempotency key.
+
+Some JetStream settings are fixed when a resource is first created and
+**cannot be changed in place** afterward — plan them before your first deploy:
+
+- **`replicas`** (one shared value for the stream, object store, and cursor KV).
+  Default `1`; set it to e.g. `3` up front for HA. Raising it later requires
+  deleting and recreating the buckets.
+- **Storage** is always file-backed; **retention** is `limits` / `discard old`.
+
 ## Consuming with the `nats` CLI
 
 ```sh
