@@ -97,6 +97,7 @@ Example `jmap2nats.json`:
 | `parts.max_bytes`           | `960MiB`                | Bucket cap.                                                                                                                                 |
 | `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                                                     |
 | `cursor.bucket`             | `<stream.name>_CURSOR`  | JetStream KV bucket for durable per-account JMAP state cursors.                                                                             |
+| `replicas`                  | `1`                     | Replica count for the stream, object store, and cursor KV. Immutable once a bucket exists — set before first deploy (e.g. `3` for HA).      |
 | `backfill_limit`            | `100`                   | N most-recent emails to re-check on first run or expired-state fallback.                                                                    |
 
 NATS authentication is optional; configure at most one of `nats.token_file`,
