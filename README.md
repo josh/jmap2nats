@@ -165,8 +165,8 @@ Each email becomes one NATS message:
   - `Jmap-Has-Attachment`, `Jmap-Size`
 - **Body**: the JMAP `Email` object as JSON -- same field names as
   [RFC 8621 §4][rfc8621-4] (`id`, `blobId`, `threadId`, `mailboxIds`,
-  `keywords`, `from`, `to`, `subject`, `receivedAt`, `bodyStructure`,
-  `textBody`, `htmlBody`, `attachments`, ...). The `bodyValues` map is
+  `keywords`, `from`, `to`, `subject`, `receivedAt`, `textBody`,
+  `htmlBody`, `attachments`, ...). The `bodyValues` map is
   omitted -- those bytes are in the object store. Each part with a
   `blobId` reports one of the following outcomes:
   - Stored parts include an `objectKey` field pointing into the bucket.

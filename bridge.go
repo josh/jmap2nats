@@ -37,18 +37,16 @@ type partResult struct {
 }
 
 type partView struct {
-	PartID      string          `json:"partId,omitempty"`
-	BlobID      jmap.ID         `json:"blobId,omitempty"`
-	Size        uint64          `json:"size,omitempty"`
-	Headers     []*email.Header `json:"headers,omitempty"`
-	Name        string          `json:"name,omitempty"`
-	Type        string          `json:"type,omitempty"`
-	Charset     string          `json:"charset,omitempty"`
-	Disposition string          `json:"disposition,omitempty"`
-	CID         string          `json:"cid,omitempty"`
-	Language    []string        `json:"language,omitempty"`
-	Location    string          `json:"location,omitempty"`
-	SubParts    []*partView     `json:"subParts,omitempty"`
+	PartID      string   `json:"partId,omitempty"`
+	BlobID      jmap.ID  `json:"blobId,omitempty"`
+	Size        uint64   `json:"size,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	Type        string   `json:"type,omitempty"`
+	Charset     string   `json:"charset,omitempty"`
+	Disposition string   `json:"disposition,omitempty"`
+	CID         string   `json:"cid,omitempty"`
+	Language    []string `json:"language,omitempty"`
+	Location    string   `json:"location,omitempty"`
 
 	ObjectKey *string `json:"objectKey,omitempty"`
 	Skipped   bool    `json:"skipped,omitempty"`
@@ -64,7 +62,6 @@ type messageView struct {
 	Keywords      map[string]bool  `json:"keywords,omitempty"`
 	Size          uint64           `json:"size,omitempty"`
 	ReceivedAt    *time.Time       `json:"receivedAt,omitempty"`
-	Headers       []*email.Header  `json:"headers,omitempty"`
 	MessageID     []string         `json:"messageId,omitempty"`
 	InReplyTo     []string         `json:"inReplyTo,omitempty"`
 	References    []string         `json:"references,omitempty"`
@@ -76,7 +73,6 @@ type messageView struct {
 	ReplyTo       []*mail.Address  `json:"replyTo,omitempty"`
 	Subject       string           `json:"subject,omitempty"`
 	SentAt        *time.Time       `json:"sentAt,omitempty"`
-	BodyStructure *partView        `json:"bodyStructure,omitempty"`
 	TextBody      []*partView      `json:"textBody,omitempty"`
 	HTMLBody      []*partView      `json:"htmlBody,omitempty"`
 	Attachments   []*partView      `json:"attachments,omitempty"`
@@ -95,7 +91,6 @@ func (e *envelope) buildView() *messageView {
 		Keywords:      em.Keywords,
 		Size:          em.Size,
 		ReceivedAt:    em.ReceivedAt,
-		Headers:       em.Headers,
 		MessageID:     em.MessageID,
 		InReplyTo:     em.InReplyTo,
 		References:    em.References,
@@ -109,7 +104,6 @@ func (e *envelope) buildView() *messageView {
 		SentAt:        em.SentAt,
 		HasAttachment: em.HasAttachment,
 		Preview:       em.Preview,
-		BodyStructure: e.partViewOf(em.BodyStructure),
 	}
 	for _, p := range em.TextBody {
 		v.TextBody = append(v.TextBody, e.partViewOf(p))
@@ -131,7 +125,6 @@ func (e *envelope) partViewOf(p *email.BodyPart) *partView {
 		PartID:      p.PartID,
 		BlobID:      p.BlobID,
 		Size:        p.Size,
-		Headers:     p.Headers,
 		Name:        p.Name,
 		Type:        p.Type,
 		Charset:     p.Charset,
@@ -139,9 +132,6 @@ func (e *envelope) partViewOf(p *email.BodyPart) *partView {
 		CID:         p.CID,
 		Language:    p.Language,
 		Location:    p.Location,
-	}
-	for _, sub := range p.SubParts {
-		pv.SubParts = append(pv.SubParts, e.partViewOf(sub))
 	}
 	if p.BlobID != "" {
 		if res, ok := e.Parts[p.BlobID]; ok {
