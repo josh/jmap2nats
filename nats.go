@@ -85,6 +85,7 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 			MaxAge:     cfg.Stream.MaxAge.Duration(),
 			MaxBytes:   cfg.Stream.MaxBytes.Int64(),
 			Duplicates: cfg.Stream.DedupWindow.Duration(),
+			Replicas:   cfg.Replicas,
 		})
 		if err != nil {
 			conn.Close()
@@ -104,6 +105,7 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 		TTL:      cfg.Stream.MaxAge.Duration(),
 		MaxBytes: cfg.Parts.MaxBytes.Int64(),
 		Storage:  jetstream.FileStorage,
+		Replicas: cfg.Replicas,
 	})
 	if err != nil {
 		conn.Close()
@@ -116,9 +118,10 @@ func ConnectNATS(ctx context.Context, cfg Config, log *slog.Logger) (*NATSResour
 	)
 
 	cursor, err := js.CreateOrUpdateKeyValue(ctx, jetstream.KeyValueConfig{
-		Bucket:  cfg.Cursor.Bucket,
-		History: 1,
-		Storage: jetstream.FileStorage,
+		Bucket:   cfg.Cursor.Bucket,
+		History:  1,
+		Storage:  jetstream.FileStorage,
+		Replicas: cfg.Replicas,
 	})
 	if err != nil {
 		conn.Close()

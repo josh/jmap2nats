@@ -29,6 +29,12 @@ config:
     max_per_part: "25MiB"
   cursor:
     bucket: "JMAP_EMAILS_CURSOR"
+  # Replica count for every JetStream resource jmap2nats creates (object store
+  # and cursor KV always; the stream too when nack.enabled is false). The NACK
+  # Stream CRD below reads this same value, so all resources stay in lockstep.
+  # Replicas are immutable after a bucket is created — set this before first
+  # deploy if you want HA (e.g. 3 on a clustered NATS).
+  replicas: 1
   backfill_limit: 100
 
 nack:
@@ -40,10 +46,11 @@ nack:
     storage: file
     retention: limits
     discard: old
-    replicas: 1
     compression: s2
     maxMsgSize: 1048576
     maxMsgsPerSubject: -1
+    # replicas is sourced from config.replicas so the stream, object store, and
+    # cursor KV always share one replica count.
   # Optionally render a NACK Account CRD so the managed Stream targets a
   # non-default NATS account via spec.account. The Account CRD is
   # connection-config only; it does NOT create the account server-side. Rendered
