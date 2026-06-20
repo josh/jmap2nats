@@ -75,30 +75,30 @@ Example `jmap2nats.json`:
 }
 ```
 
-| JSON path                   | Default                 | Notes                                                                                                                                       |
-| --------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `jmap.session_url`          | (required)              | e.g. `https://api.fastmail.com/jmap/session`                                                                                                |
-| `jmap.token_file`           | (required)              | Path to a file containing the bearer token. Trailing whitespace is trimmed. Keep mode 0400.                                                 |
-| `jmap.account_id`           | primary mail account    | Override if not the session primary.                                                                                                        |
-| `nats.url`                  | `nats://localhost:4222` |                                                                                                                                             |
-| `nats.token_file`           | unset                   | Path to a file containing a NATS auth token. Trailing whitespace is trimmed.                                                                |
-| `nats.user`                 | unset                   | NATS username (literal); set together with `nats.password_file`. Mutually exclusive with `nats.user_file`.                                  |
-| `nats.user_file`            | unset                   | Path to a file containing the NATS username; alternative to the literal `nats.user`. Trailing whitespace is trimmed.                        |
-| `nats.password_file`        | unset                   | Path to a file containing the NATS password (plaintext, even when the server stores a bcrypt hash). Trailing whitespace is trimmed.         |
-| `nats.creds_file`           | unset                   | Path to a NATS creds file (decentralized JWT / NGS); the `nsc`-generated bundle of the user JWT + signing nkey seed.                        |
-| `nats.nkey_seed_file`       | unset                   | Path to a NATS nkey seed file. The seed signs the server's challenge.                                                                       |
-| `stream.name`               | `JMAP_EMAILS`           |                                                                                                                                             |
-| `stream.subject_prefix`     | `jmap.email`            | Subject = `<prefix>.<accountId>`.                                                                                                           |
-| `stream.max_age`            | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.                                                                                              |
-| `stream.max_bytes`          | `64MiB`                 | Sizes accept `KiB`/`MiB`/`GiB`.                                                                                                             |
-| `stream.dedup_window`       | `24h`                   | Server-side `Nats-Msg-Id` dedup window. Catches concurrent HA publishes; boot-time republishes are gated separately by the high-water mark. |
-| `stream.externally_managed` | `false`                 | Skip create/update; only verify the stream exists. Set true when another operator (e.g. NACK) owns the stream config.                       |
-| `parts.bucket`              | `email-parts`           | Object Store bucket for all body/attachment parts.                                                                                          |
-| `parts.max_bytes`           | `960MiB`                | Bucket cap.                                                                                                                                 |
-| `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                                                     |
-| `cursor.bucket`             | `<stream.name>_CURSOR`  | JetStream KV bucket for durable per-account JMAP state cursors.                                                                             |
-| `replicas`                  | `1`                     | Replica count for the stream, object store, and cursor KV. Immutable once a bucket exists — set before first deploy (e.g. `3` for HA).      |
-| `backfill_limit`            | `100`                   | N most-recent emails to re-check on first run or expired-state fallback.                                                                    |
+| JSON path                   | Default                 | Notes                                                                                                                                                                                                                                                  |
+| --------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `jmap.session_url`          | (required)              | e.g. `https://api.fastmail.com/jmap/session`                                                                                                                                                                                                           |
+| `jmap.token_file`           | (required)              | Path to a file containing the bearer token. Trailing whitespace is trimmed. Keep mode 0400.                                                                                                                                                            |
+| `jmap.account_id`           | primary mail account    | Override if not the session primary.                                                                                                                                                                                                                   |
+| `nats.url`                  | `nats://localhost:4222` |                                                                                                                                                                                                                                                        |
+| `nats.token_file`           | unset                   | Path to a file containing a NATS auth token. Trailing whitespace is trimmed.                                                                                                                                                                           |
+| `nats.user`                 | unset                   | NATS username (literal); set together with `nats.password_file`. Mutually exclusive with `nats.user_file`.                                                                                                                                             |
+| `nats.user_file`            | unset                   | Path to a file containing the NATS username; alternative to the literal `nats.user`. Trailing whitespace is trimmed.                                                                                                                                   |
+| `nats.password_file`        | unset                   | Path to a file containing the NATS password (plaintext, even when the server stores a bcrypt hash). Trailing whitespace is trimmed.                                                                                                                    |
+| `nats.creds_file`           | unset                   | Path to a NATS creds file (decentralized JWT / NGS); the `nsc`-generated bundle of the user JWT + signing nkey seed.                                                                                                                                   |
+| `nats.nkey_seed_file`       | unset                   | Path to a NATS nkey seed file. The seed signs the server's challenge.                                                                                                                                                                                  |
+| `stream.name`               | `JMAP_EMAILS`           |                                                                                                                                                                                                                                                        |
+| `stream.subject_prefix`     | `jmap.email`            | Subject = `<prefix>.<accountId>`.                                                                                                                                                                                                                      |
+| `stream.max_age`            | `168h` (1 week)         | Stream `MaxAge`; also TTL on the object store.                                                                                                                                                                                                         |
+| `stream.max_bytes`          | `64MiB`                 | Sizes accept `KiB`/`MiB`/`GiB`.                                                                                                                                                                                                                        |
+| `stream.dedup_window`       | `24h`                   | Server-side `Nats-Msg-Id` dedup window. Catches concurrent HA publishes; boot-time republishes are gated separately by the high-water mark.                                                                                                            |
+| `stream.externally_managed` | `false`                 | Skip create/update; only verify the stream exists. Set true when another operator (e.g. NACK) owns the stream config.                                                                                                                                  |
+| `parts.bucket`              | `email-parts`           | Object Store bucket for all body/attachment parts.                                                                                                                                                                                                     |
+| `parts.max_bytes`           | `960MiB`                | Bucket cap.                                                                                                                                                                                                                                            |
+| `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                                                                                                                                                                |
+| `cursor.bucket`             | `<stream.name>_CURSOR`  | JetStream KV bucket for durable per-account JMAP state cursors.                                                                                                                                                                                        |
+| `replicas`                  | `1`                     | Replica count for the object store and cursor KV (and the stream, unless `stream.externally_managed`). Reconciled on every startup, so changing it and restarting applies it live on a clustered NATS; must not exceed the node count. Set `3` for HA. |
+| `backfill_limit`            | `100`                   | N most-recent emails to re-check on first run or expired-state fallback.                                                                                                                                                                               |
 
 NATS authentication is optional; configure at most one of `nats.token_file`,
 `nats.user`/`nats.user_file` + `nats.password_file`, `nats.creds_file`, or
@@ -223,13 +223,16 @@ these will not change incompatibly:
   dedup window (`stream.dedup_window`) absorbs the replay. Consumers should
   treat the dedup id as the idempotency key.
 
-Some JetStream settings are fixed when a resource is first created and
-**cannot be changed in place** afterward — plan them before your first deploy:
+`replicas` is one shared value for the object store and cursor KV — and the
+stream too, unless `stream.externally_managed` (then whoever owns the stream,
+e.g. NACK, owns its replica count). It is reconciled on every startup via
+create-or-update, so changing it and restarting applies the new count live; this
+needs a clustered NATS and must not exceed the node count. Default `1`; set it to
+e.g. `3` for HA.
 
-- **`replicas`** (one shared value for the stream, object store, and cursor KV).
-  Default `1`; set it to e.g. `3` up front for HA. Raising it later requires
-  deleting and recreating the buckets.
-- **Storage** is always file-backed; **retention** is `limits` / `discard old`.
+Some JetStream settings are genuinely fixed when a resource is first created and
+**cannot be changed in place** — plan them before your first deploy: **storage**
+is always file-backed, and **retention** is `limits` / `discard old`.
 
 ## Consuming with the `nats` CLI
 
