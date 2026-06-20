@@ -40,6 +40,9 @@ func NewJMAPClient(cfg Config, log *slog.Logger) (*JMAPClient, error) {
 			return nil, fmt.Errorf("jmap session has no primary mail account; set jmap.account_id")
 		}
 	}
+	if !validJMAPID(string(accountID)) {
+		return nil, fmt.Errorf("jmap account id %q is not a valid JMAP id (RFC 8620 §1.2: A-Za-z0-9_-)", accountID)
+	}
 	log.Info("jmap authenticated",
 		"session_url", cfg.JMAP.SessionURL,
 		"username", client.Session.Username,
@@ -50,6 +53,26 @@ func NewJMAPClient(cfg Config, log *slog.Logger) (*JMAPClient, error) {
 
 func (j *JMAPClient) AccountID() jmap.ID   { return j.accountID }
 func (j *JMAPClient) Client() *jmap.Client { return j.client }
+
+// validJMAPID reports whether s is a syntactically valid JMAP id. RFC 8620 §1.2
+// restricts ids to the URL-safe characters A-Za-z0-9_- (1-255 octets). The
+// stream subject, dedup id, and object-store key embed account/email/blob ids
+// with raw "." and "/" separators, so this charset is what keeps those keys
+// unambiguous — a server returning anything else is rejected rather than
+// producing a malformed (and now frozen) key layout.
+func validJMAPID(s string) bool {
+	if s == "" || len(s) > 255 {
+		return false
+	}
+	for _, c := range s {
+		switch {
+		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '-', c == '_':
+		default:
+			return false
+		}
+	}
+	return true
+}
 
 func (j *JMAPClient) QueryRecent(limit uint64) ([]jmap.ID, error) {
 	req := &jmap.Request{}

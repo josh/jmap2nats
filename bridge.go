@@ -437,6 +437,9 @@ func (b *Bridge) onStateChange(sc *jmap.StateChange, trigger chan<- struct{}) {
 }
 
 func (b *Bridge) processOne(ctx context.Context, id jmap.ID) error {
+	if !validJMAPID(string(id)) {
+		return fmt.Errorf("invalid JMAP email id %q (RFC 8620 §1.2: A-Za-z0-9_-)", id)
+	}
 	em, err := b.jc.FetchEmail(id)
 	if err != nil {
 		return err
@@ -475,6 +478,10 @@ func (b *Bridge) storeParts(ctx context.Context, env *envelope) {
 		}
 		res := &partResult{}
 		env.Parts[p.BlobID] = res
+		if !validJMAPID(string(p.BlobID)) {
+			res.Error = "invalid blob id"
+			return
+		}
 		if p.Size > maxBytes {
 			res.Skipped = true
 			b.log.Debug("part skipped (too large)",
