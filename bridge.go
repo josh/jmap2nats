@@ -80,7 +80,7 @@ type messageView struct {
 	TextBody      []*partView      `json:"textBody,omitempty"`
 	HTMLBody      []*partView      `json:"htmlBody,omitempty"`
 	Attachments   []*partView      `json:"attachments,omitempty"`
-	HasAttachment bool             `json:"hasAttachment,omitempty"`
+	HasAttachment bool             `json:"hasAttachment"`
 	Preview       string           `json:"preview,omitempty"`
 }
 
