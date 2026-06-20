@@ -163,6 +163,14 @@ Each email becomes one NATS message:
   - `Jmap-Message-Id`, `Jmap-In-Reply-To`, `Jmap-References`
   - `Jmap-Mailbox-Ids`, `Jmap-Keywords`
   - `Jmap-Has-Attachment`, `Jmap-Size`
+
+  Header values are single-line: any `\r`/`\n` in the source is collapsed to a
+  space. `Jmap-From`, `Jmap-To`, and `Jmap-Cc` are best-effort
+  human-readable (`Name <addr>`) for filtering and display only — display
+  names are not quoted and may contain the `, ` list separator, so they are not
+  safely splittable. Structured consumers should parse the JSON body's `from` /
+  `to` / `cc` arrays instead.
+
 - **Body**: the JMAP `Email` object as JSON -- same field names as
   [RFC 8621 §4][rfc8621-4] (`id`, `blobId`, `threadId`, `mailboxIds`,
   `keywords`, `from`, `to`, `subject`, `receivedAt`, `textBody`,
