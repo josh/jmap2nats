@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -196,6 +197,7 @@ func (e *envelope) NATSHeaders() nats.Header {
 		for id := range em.MailboxIDs {
 			ids = append(ids, string(id))
 		}
+		sort.Strings(ids)
 		h.Set("Jmap-Mailbox-Ids", strings.Join(ids, ","))
 	}
 	if len(em.Keywords) > 0 {
@@ -205,6 +207,7 @@ func (e *envelope) NATSHeaders() nats.Header {
 				ks = append(ks, k)
 			}
 		}
+		sort.Strings(ks)
 		h.Set("Jmap-Keywords", strings.Join(ks, ","))
 	}
 	h.Set("Jmap-Has-Attachment", strconv.FormatBool(em.HasAttachment))
