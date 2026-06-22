@@ -4,9 +4,11 @@ A small Go service that subscribes to a JMAP email server's push stream
 and republishes newly-arrived emails onto a NATS JetStream stream.
 
 - **Real-time** via JMAP's `EventSource` (server-sent events). No polling.
-- **HA-safe**: run multiple replicas — every publish carries a `Nats-Msg-Id`
-  set to `<accountId>/<emailId>`, so concurrent publishes from different
-  replicas are deduplicated server-side within the stream's `DuplicateWindow`.
+- **HA-safe**: run multiple instances (Pod `replicaCount`, distinct from the
+  `jetstream_replicas` data-replication factor) — every publish carries a
+  `Nats-Msg-Id` set to `<accountId>/<emailId>`, so concurrent publishes from
+  different instances are deduplicated server-side within the stream's
+  `DuplicateWindow`.
 - **Outage-tolerant**: the service persists the last successfully processed
   JMAP `Email` state in a NATS KV bucket and resumes from that cursor after
   restarts. If the server can no longer calculate changes from the saved state,
@@ -97,7 +99,7 @@ Example `jmap2nats.json`:
 | `parts.max_bytes`           | `960MiB`                | Bucket cap.                                                                                                                                                                                                                                            |
 | `parts.max_per_part`        | `25MiB`                 | Skip individual parts larger than this.                                                                                                                                                                                                                |
 | `cursor.bucket`             | `<stream.name>_CURSOR`  | JetStream KV bucket for durable per-account JMAP state cursors.                                                                                                                                                                                        |
-| `replicas`                  | `1`                     | Replica count for the object store and cursor KV (and the stream, unless `stream.externally_managed`). Reconciled on every startup, so changing it and restarting applies it live on a clustered NATS; must not exceed the node count. Set `3` for HA. |
+| `jetstream_replicas`        | `1`                     | JetStream replication factor (data copies) for the object store and cursor KV (and the stream, unless `stream.externally_managed`). Reconciled on every startup, so changing it and restarting applies it live on a clustered NATS; must not exceed the node count. Set `3` for HA. Distinct from the chart's `replicaCount` (Pod count). |
 | `backfill_limit`            | `100`                   | N most-recent emails to re-check on first run or expired-state fallback.                                                                                                                                                                               |
 
 NATS authentication is optional; configure at most one of `nats.token_file`,
@@ -138,8 +140,8 @@ The service:
    created email as it arrives.
 
 For HA, run several copies pointed at the same NATS cluster. Concurrent
-publishes (same JMAP account id and email id from different replicas) are
-rejected by the stream's `Nats-Msg-Id` dedup window; replicas share the same
+publishes (same JMAP account id and email id from different instances) are
+rejected by the stream's `Nats-Msg-Id` dedup window; instances share the same
 per-account cursor in NATS KV, so normal restarts resume from the last saved
 JMAP state rather than from message ordering in the stream.
 
@@ -223,12 +225,13 @@ these will not change incompatibly:
   dedup window (`stream.dedup_window`) absorbs the replay. Consumers should
   treat the dedup id as the idempotency key.
 
-`replicas` is one shared value for the object store and cursor KV — and the
-stream too, unless `stream.externally_managed` (then whoever owns the stream,
-e.g. NACK, owns its replica count). It is reconciled on every startup via
+`jetstream_replicas` is one shared value for the object store and cursor KV —
+and the stream too, unless `stream.externally_managed` (then whoever owns the
+stream, e.g. NACK, owns its replica count). It is reconciled on every startup via
 create-or-update, so changing it and restarting applies the new count live; this
 needs a clustered NATS and must not exceed the node count. Default `1`; set it to
-e.g. `3` for HA.
+e.g. `3` for HA. This is the data-replication factor, not the number of running
+instances (the chart's `replicaCount`).
 
 Some JetStream settings are genuinely fixed when a resource is first created and
 **cannot be changed in place** — plan them before your first deploy: **storage**

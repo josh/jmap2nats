@@ -5,6 +5,10 @@ image:
 
 imagePullSecrets: []
 
+# Number of jmap2nats Pods (process replicas). Independent of
+# config.jetstream_replicas below, which is the data replication factor. Running
+# more than one is safe: every publish carries a Nats-Msg-Id, so concurrent
+# publishes are deduplicated server-side, and all Pods share one cursor KV.
 replicaCount: 1
 
 # Application config. Maps 1:1 to jmap2nats's config.json schema. The chart
@@ -29,12 +33,15 @@ config:
     max_per_part: "25MiB"
   cursor:
     bucket: "JMAP_EMAILS_CURSOR"
-  # Replica count for every JetStream resource jmap2nats creates (object store
-  # and cursor KV always; the stream too when nack.enabled is false). The NACK
-  # Stream CRD below reads this same value, so all resources stay in lockstep.
-  # Replicas are immutable after a bucket is created — set this before first
-  # deploy if you want HA (e.g. 3 on a clustered NATS).
-  replicas: 1
+  # JetStream replication factor — how many copies of the data are kept across
+  # NATS nodes. Applies to every JetStream resource jmap2nats creates (object
+  # store and cursor KV always; the stream too when nack.enabled is false), and
+  # the NACK Stream CRD below reads this same value, so all resources stay in
+  # lockstep. Reconciled on every startup via create-or-update, so changing it
+  # and restarting applies the new count live; needs a clustered NATS and must
+  # not exceed the node count. This is the data-copy count, NOT the number of
+  # jmap2nats Pods (see replicaCount above). Default 1; set 3 for HA.
+  jetstream_replicas: 1
   backfill_limit: 100
 
 nack:
@@ -49,16 +56,16 @@ nack:
     compression: s2
     maxMsgSize: 1048576
     maxMsgsPerSubject: -1
-    # replicas is sourced from config.replicas so the stream, object store, and
-    # cursor KV always share one replica count.
+    # replicas is sourced from config.jetstream_replicas so the stream, object
+    # store, and cursor KV always share one replica count.
   # Optionally render a NACK Account CRD so the managed Stream targets a
   # non-default NATS account via spec.account. The Account CRD is
   # connection-config only; it does NOT create the account server-side. Rendered
   # only when nack.enabled is true and account.name is set; credentials come
   # from secrets.nack (which defaults to reusing secrets.nats).
   account:
-    name: ""        # Account CRD metadata.name + spec.name; "" disables rendering.
-    servers: []     # defaults to [ config.nats.url ]
+    name: "" # Account CRD metadata.name + spec.name; "" disables rendering.
+    servers: [] # defaults to [ config.nats.url ]
 
 # Every Kubernetes Secret this chart consumes. The auth blocks are modeled on
 # the NACK Account CRD connection schema (jetstream.nats.io): each method nests
@@ -80,10 +87,11 @@ secrets:
   # config.jmap.token_file is injected into the rendered config.json.
   jmap:
     secret:
-      name: ""              # defaults to <fullname>-secrets; the nats/nack
-                            # methods below default to this same Secret, so one
-                            # Secret with per-credential keys is the common case.
-    token: token            # key in the Secret holding the bearer token
+      name:
+        "" # defaults to <fullname>-secrets; the nats/nack
+        # methods below default to this same Secret, so one
+        # Secret with per-credential keys is the common case.
+    token: token # key in the Secret holding the bearer token
 
   # App NATS auth. The connection is anonymous unless exactly ONE method block
   # below is populated. Each method's secret.name defaults to
@@ -91,23 +99,23 @@ secrets:
   # the JMAP token or in a dedicated Secret. The chart mounts the key(s) to
   # files and injects the matching nats.*_file path(s) into config.json.
   nats:
-    token:                  # -> nats.token_file
+    token: # -> nats.token_file
       secret:
         name: ""
-      token: ""             # key holding the token
-    user:                   # -> nats.user_file + nats.password_file
+      token: "" # key holding the token
+    user: # -> nats.user_file + nats.password_file
       secret:
         name: ""
-      user: ""              # key holding the username
-      password: ""          # key holding the password
-    creds:                  # -> nats.creds_file
+      user: "" # key holding the username
+      password: "" # key holding the password
+    creds: # -> nats.creds_file
       secret:
         name: ""
-      file: ""              # key holding the nsc creds file
-    nkey:                   # -> nats.nkey_seed_file
+      file: "" # key holding the nsc creds file
+    nkey: # -> nats.nkey_seed_file
       secret:
         name: ""
-      seed: ""              # key holding the nkey seed
+      seed: "" # key holding the nkey seed
 
   # Auth for the NACK Account CRD (only used when nack.account.name is set).
   # Leave entirely empty to REUSE secrets.nats (same method, Secret, and keys).

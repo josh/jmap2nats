@@ -10,13 +10,13 @@ import (
 )
 
 type Config struct {
-	JMAP          JMAPConfig   `json:"jmap"`
-	NATS          NATSConfig   `json:"nats"`
-	Stream        StreamConfig `json:"stream"`
-	Parts         PartsConfig  `json:"parts"`
-	Cursor        CursorConfig `json:"cursor"`
-	Replicas      int          `json:"replicas"`
-	BackfillLimit uint64       `json:"backfill_limit"`
+	JMAP              JMAPConfig   `json:"jmap"`
+	NATS              NATSConfig   `json:"nats"`
+	Stream            StreamConfig `json:"stream"`
+	Parts             PartsConfig  `json:"parts"`
+	Cursor            CursorConfig `json:"cursor"`
+	JetStreamReplicas int          `json:"jetstream_replicas"`
+	BackfillLimit     uint64       `json:"backfill_limit"`
 }
 
 type JMAPConfig struct {
@@ -71,8 +71,8 @@ func defaultConfig() Config {
 			MaxBytes:   960 * MiB,
 			MaxPerPart: 25 * MiB,
 		},
-		Replicas:      1,
-		BackfillLimit: 100,
+		JetStreamReplicas: 1,
+		BackfillLimit:     100,
 	}
 }
 
@@ -150,8 +150,8 @@ func (c Config) validate() error {
 	if c.Stream.MaxAge <= 0 {
 		return fmt.Errorf("stream.max_age must be positive")
 	}
-	if c.Replicas < 1 {
-		return fmt.Errorf("replicas must be at least 1")
+	if c.JetStreamReplicas < 1 {
+		return fmt.Errorf("jetstream_replicas must be at least 1")
 	}
 	if c.BackfillLimit == 0 {
 		return fmt.Errorf("backfill_limit must be positive")
