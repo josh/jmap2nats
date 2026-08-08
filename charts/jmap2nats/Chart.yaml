@@ -2,8 +2,8 @@ apiVersion: v2
 name: jmap2nats
 description: Bridge JMAP email push events to NATS JetStream
 type: application
-version: "1.0.0"
-appVersion: "1.0.0"
+version: "1.0.1"
+appVersion: "1.0.1"
 kubeVersion: ">=1.25.0-0"
 home: https://github.com/josh/jmap2nats
 sources:
