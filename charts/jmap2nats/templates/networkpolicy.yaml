@@ -1,0 +1,73 @@
+{{- include "jmap2nats.validate" . -}}
+{{- if .Values.networkPolicy.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ printf "%s-ingress" (include "jmap2nats.fullname" .) }}
+  labels:
+    {{- include "jmap2nats.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "jmap2nats.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  {{- with .Values.networkPolicy.ingress.from }}
+  ingress:
+    - from:
+        {{- toYaml . | nindent 8 }}
+  {{- else }}
+  # The bridge accepts no connections, so the usual case is a deny-all policy.
+  ingress: []
+  {{- end }}
+{{- end }}
+{{- if and .Values.networkPolicy.ingress.enabled .Values.networkPolicy.egress.enabled }}
+---
+{{- end }}
+{{- if .Values.networkPolicy.egress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ printf "%s-egress" (include "jmap2nats.fullname" .) }}
+  labels:
+    {{- include "jmap2nats.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "jmap2nats.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # Always present: neither config.jmap.session_url nor config.nats.url can be
+    # resolved without it. Destination-agnostic unless dnsTo names the resolvers.
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+      {{- with .Values.networkPolicy.egress.dnsTo }}
+      to:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.networkPolicy.egress.nats.to }}
+    # The NATS server behind config.nats.url.
+    - to:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ $.Values.networkPolicy.egress.nats.port | int }}
+    {{- end }}
+    {{- with .Values.networkPolicy.egress.jmap.to }}
+    # The JMAP server. The session response hands back apiUrl, downloadUrl and
+    # eventSourceUrl at runtime, so this must cover every host it may return,
+    # not just config.jmap.session_url.
+    - to:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ $.Values.networkPolicy.egress.jmap.port | int }}
+    {{- end }}
+    {{- with .Values.networkPolicy.egress.extraRules }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

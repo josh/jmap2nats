@@ -143,6 +143,45 @@ secrets:
         name: ""
       seed: ""
 
+# Pod NetworkPolicies, split by direction so each can be enabled independently.
+# Both are off by default, so upgrading an existing release changes nothing.
+#
+# Enabling a direction makes it an allowlist — there is no permit-everything
+# mode, because a policy that allows every peer still punches through a
+# namespace-wide default deny for these pods.
+networkPolicy:
+  ingress:
+    # The bridge accepts no connections at all: the chart renders no Service and
+    # the container declares no ports. Enabling this therefore renders a
+    # deny-all policy, which is the intended configuration.
+    enabled: false
+    # NetworkPolicyPeer entries allowed to reach the pods. Normally left empty;
+    # set it only if you add a sidecar or scraper through other means.
+    from: []
+  egress:
+    # Creates an egress policy for the bridge pods. DNS is always included:
+    # neither the JMAP server nor NATS can be resolved without it.
+    enabled: false
+    # NetworkPolicyPeer entries limiting where DNS may be sent. Empty leaves the
+    # rule destination-agnostic, so it works with CoreDNS, kube-dns, and
+    # node-local DNS without assuming cluster-specific labels or addresses.
+    dnsTo: []
+    # Egress to config.nats.url. NetworkPolicy is L3/L4-only and cannot resolve
+    # a URL, so name the peers yourself; port must match the one in the URL.
+    nats:
+      to: []
+      port: 4222
+    # Egress to the JMAP server. The session response returns apiUrl,
+    # downloadUrl and eventSourceUrl at runtime, so these peers must cover every
+    # host the server may hand back — not only config.jmap.session_url. An
+    # ipBlock of the provider's published ranges, or 0.0.0.0/0 with private
+    # ranges excepted, are both reasonable depending on how much you trust DNS.
+    jmap:
+      to: []
+      port: 443
+    # Complete NetworkPolicyEgressRule entries for any other destination.
+    extraRules: []
+
 serviceAccount:
   create: true
   name: ""

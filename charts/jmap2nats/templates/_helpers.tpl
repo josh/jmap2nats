@@ -218,6 +218,15 @@ configmap.yaml so any render path triggers it.
 {{- if and (gt $nackCount 0) (not .Values.nack.account.name) -}}
 {{- fail "secrets.nack is populated but nack.account.name is empty; set nack.account.name or clear secrets.nack" -}}
 {{- end -}}
+{{- if .Values.networkPolicy.egress.enabled -}}
+{{- $extra := .Values.networkPolicy.egress.extraRules -}}
+{{- if not (or .Values.networkPolicy.egress.nats.to $extra) -}}
+{{- fail "networkPolicy.egress.enabled needs peers reaching config.nats.url; set networkPolicy.egress.nats.to" -}}
+{{- end -}}
+{{- if not (or .Values.networkPolicy.egress.jmap.to $extra) -}}
+{{- fail "networkPolicy.egress.enabled needs peers reaching the JMAP server; set networkPolicy.egress.jmap.to" -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
