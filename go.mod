@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	git.sr.ht/~rockorager/go-jmap v0.5.3
-	github.com/nats-io/nats.go v1.54.0
+	github.com/nats-io/nats.go v1.55.0
 )
 
 require (
